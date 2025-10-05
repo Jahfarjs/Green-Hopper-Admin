@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import logo from '../assets/logo-white.png'
-import { LockClosedIcon, EnvelopeIcon } from '@heroicons/react/24/outline'
+import { LockClosedIcon, EnvelopeIcon, UserIcon } from '@heroicons/react/24/outline'
 
 const API_BASE_URL = import.meta.env.VITE_ADMIN_API_URL
 
@@ -9,6 +9,7 @@ function LoginPage() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [selectedRole, setSelectedRole] = useState('hotel_admin')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -20,13 +21,20 @@ function LoginPage() {
       const res = await fetch(`${API_BASE_URL}/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ email, password, role: selectedRole })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data?.message || 'Login failed')
 
       localStorage.setItem('admin_token', data.token)
-      navigate('/dashboard', { replace: true })
+      localStorage.setItem('admin_role', selectedRole)
+      
+      // Navigate based on selected role
+      if (selectedRole === 'hotel_admin') {
+        navigate('/dashboard', { replace: true })
+      } else if (selectedRole === 'package_admin') {
+        navigate('/package-dashboard', { replace: true })
+      }
     } catch (err) {
       setError(err.message)
     } finally {
@@ -76,6 +84,21 @@ function LoginPage() {
               </div>
             )}
             <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm text-white mb-1">Admin Role</label>
+                <div className="relative">
+                  <UserIcon className="h-5 w-5 text-white/40 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <select
+                    value={selectedRole}
+                    onChange={(e) => setSelectedRole(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-[#0c0c0c] border border-white/5 rounded-lg focus:outline-none focus:border-[#5B8424] text-white appearance-none"
+                    required
+                  >
+                    <option value="hotel_admin">Hotel Admin</option>
+                    <option value="package_admin">Package Admin</option>
+                  </select>
+                </div>
+              </div>
               <div>
                 <label className="block text-sm text-white mb-1">Email</label>
                 <div className="relative">
