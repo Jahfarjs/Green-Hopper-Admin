@@ -3,43 +3,42 @@ import { NavLink } from 'react-router-dom'
 import logo from '../assets/logo-white.png'
 import {
   HomeIcon,
-  ClockIcon,
-  CheckBadgeIcon,
-  XCircleIcon,
-  BuildingOfficeIcon,
   MapPinIcon,
-  UsersIcon,
-  BriefcaseIcon,
-  BuildingOffice2Icon,
-  CreditCardIcon,
-  BanknotesIcon,
-  TruckIcon,
+  CalendarIcon,
+  BuildingOfficeIcon,
+  CubeIcon,
+  CurrencyDollarIcon,
   DocumentTextIcon,
 } from '@heroicons/react/24/outline'
 
 function Sidebar() {
+  const role = localStorage.getItem('admin_role')
+  
+  // Define navigation items based on admin roles
   const navItems = [
-    { 
-      to: '/dashboard', 
-      label: 'Bookings', 
-      icon: HomeIcon, 
-      end: true,
-      subItems: [
-        { to: '/dashboard', label: 'All Bookings', icon: HomeIcon, end: true },
-        { to: '/dashboard/pending', label: 'Pending', icon: ClockIcon },
-        { to: '/dashboard/accepted', label: 'Accepted', icon: CheckBadgeIcon },
-        { to: '/dashboard/rejected', label: 'Rejected', icon: XCircleIcon },
-      ]
-    },
-    { to: '/dashboard/hotels', label: 'Hotels', icon: BuildingOfficeIcon },
-    { to: '/dashboard/destinations', label: 'Destinations', icon: MapPinIcon },
-    { to: '/dashboard/customers', label: 'Customers', icon: UsersIcon },
-    { to: '/dashboard/packages', label: 'Packages', icon: BriefcaseIcon },
-    { to: '/dashboard/hotel-bookings', label: 'Hotel Bookings', icon: BuildingOffice2Icon },
-    { to: '/dashboard/payments', label: 'Payments', icon: CreditCardIcon },
-    { to: '/dashboard/expenses', label: 'Expenses', icon: BanknotesIcon },
-    { to: '/dashboard/transports', label: 'Transports', icon: TruckIcon },
+    // Dashboard links
+    { to: '/dashboard', label: 'Dashboard', icon: HomeIcon, roles: ['hotel_admin'] },
+    { to: '/package-dashboard', label: 'Dashboard', icon: HomeIcon, roles: ['package_admin'] },
+    
+    // Destinations section (Hotel Admin now has access)
+    { to: '/destinations', label: 'Destinations', icon: MapPinIcon, roles: ['hotel_admin'] },
+    
+    // Hotel Management section (Hotel Admin only)
+    { to: '/hotel-management', label: 'Hotel Management', icon: BuildingOfficeIcon, roles: ['hotel_admin'] },
+    { to: '/expenditure-management', label: 'Expenditure Management', icon: CurrencyDollarIcon, roles: ['hotel_admin'] },
+    { to: '/receipt-generation', label: 'Receipt Generation', icon: DocumentTextIcon, roles: ['hotel_admin'] },
+    
+    // Package Management section (Package Admin only)
+    { to: '/package-management', label: 'Package Management', icon: CubeIcon, roles: ['package_admin'] },
+    
+    // Bookings section (Hotel Admin now has access)
+    { to: '/bookings', label: 'Bookings', icon: CalendarIcon, roles: ['hotel_admin'] },
   ]
+  
+  // Filter navigation items based on user role
+  const filteredNavItems = navItems.filter(item => 
+    !item.roles || item.roles.includes(role)
+  )
 
   return (
     <aside className="fixed top-0 left-0 h-full w-64 bg-[#0f1310] border-r border-[#5B8424]/20 p-6 hidden md:flex md:flex-col z-30">
@@ -47,7 +46,7 @@ function Sidebar() {
         <img src={logo} alt="GreenHopper" className="h-12" />
       </div>
       <nav className="space-y-2">
-        {navItems.map(({ to, label, icon: Icon, end, subItems }) => (
+        {filteredNavItems.map(({ to, label, icon: Icon, end, subItems }) => (
           <div key={to}>
             <NavLink
               to={to}
