@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage'
 import MainAdminDashboardPage from './pages/main/MainAdminDashboardPage'
 import HotelAdminDashboardPage from './pages/hotel/HotelAdminDashboardPage'
 import HotelManagementPage from './pages/hotel/HotelManagementPage'
+import VehicleManagementPage from './pages/hotel/VehicleManagementPage'
 import ExpenditureManagementPage from './pages/hotel/ExpenditureManagementPage'
 import ReceiptGenerationPage from './pages/hotel/ReceiptGenerationPage'
 import PackageAdminDashboardPage from './pages/package/PackageAdminDashboardPage'
@@ -11,6 +12,7 @@ import PackageManagementPage from './pages/package/PackageManagementPage'
 import DestinationsPage from './pages/DestinationsPage'
 import BookingPage from './pages/BookingPage'
 import Navbar from './components/Navbar'
+import Footer from './components/Footer'
 
 // Error Boundary Component
 class ErrorBoundary extends React.Component {
@@ -48,9 +50,10 @@ function App() {
     return (
       <div className="h-screen bg-gradient-to-b from-black via-[#0b0b0b] to-[#111111] text-white flex flex-col overflow-hidden">
         <Navbar />
-        <div className="flex-1 overflow-y-auto p-2 md:p-4">
+        <div className="flex-1 overflow-y-auto p-2 md:p-4 pb-20">
           {children}
         </div>
+        <Footer />
       </div>
     )
   }
@@ -116,6 +119,17 @@ function App() {
             <ProtectedRoute>
               <AdminLayout>
                 <HotelManagementPage />
+              </AdminLayout>
+            </ProtectedRoute>
+          }
+        />
+        
+        <Route
+          path="/vehicle-management"
+          element={
+            <ProtectedRoute>
+              <AdminLayout>
+                <VehicleManagementPage />
               </AdminLayout>
             </ProtectedRoute>
           }

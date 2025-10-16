@@ -148,10 +148,8 @@ const HotelAdminDashboardPage = () => {
         
         setStatistics(combinedStatistics);
       } else {
-        console.error('Failed to fetch statistics');
       }
     } catch (error) {
-      console.error('Error fetching statistics:', error);
     } finally {
       setLoading(false);
     }
@@ -310,7 +308,7 @@ const HotelAdminDashboardPage = () => {
   } : null;
 
   return (
-    <div className="p-6">
+    <div className="p-6 pb-24">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-white mb-2">Hotel Admin Dashboard</h1>
         <p className="text-gray-400">Hotel administration panel with comprehensive statistics</p>

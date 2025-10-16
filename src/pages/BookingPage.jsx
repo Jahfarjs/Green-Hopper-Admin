@@ -55,7 +55,6 @@ function BookingPage() {
       const data = await response.json()
       setBookings(data.bookings || [])
     } catch (error) {
-      console.error('Error fetching bookings:', error)
       setError('Failed to load bookings')
     } finally {
       setLoading(false)
@@ -100,7 +99,8 @@ function BookingPage() {
       booking.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       booking.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
       booking.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      booking.nationality.toLowerCase().includes(searchQuery.toLowerCase())
+      booking.nationality.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      booking.numberOfDays.toString().includes(searchQuery)
     
     return matchesStatus && matchesSearch
   })
@@ -177,7 +177,6 @@ function BookingPage() {
       })
       
     } catch (error) {
-      console.error('Error updating booking status:', error)
       setSuccessMessage({
         type: 'error',
         title: 'Update Failed',
@@ -242,7 +241,7 @@ function BookingPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       {/* Success Message Overlay */}
       {successMessage && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -377,7 +376,7 @@ function BookingPage() {
               <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Search bookings by name, email, destination, or nationality..."
+                placeholder="Search bookings by name, email, destination, nationality, or number of days..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-[#2a2a2a] border border-[#444] rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#5B8424]"
@@ -467,7 +466,7 @@ function BookingPage() {
                         </span>
                       </div>
                       
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
                         <div className="flex items-center gap-2 text-gray-300">
                           <EnvelopeIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
                           <span className="truncate">{booking.email}</span>
@@ -483,6 +482,10 @@ function BookingPage() {
                         <div className="flex items-center gap-2 text-gray-300">
                           <CalendarIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
                           <span className="truncate">{formatDate(booking.preferredDate)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-300">
+                          <ClockIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                          <span className="truncate">{booking.numberOfDays} day{booking.numberOfDays !== 1 ? 's' : ''}</span>
                         </div>
                       </div>
                       
@@ -643,6 +646,10 @@ function BookingPage() {
                       <div>
                         <label className="text-sm text-gray-400">Preferred Date</label>
                         <p className="text-white font-medium">{formatDate(selectedBooking.preferredDate)}</p>
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-400">Number of Days</label>
+                        <p className="text-white font-medium">{selectedBooking.numberOfDays} day{selectedBooking.numberOfDays !== 1 ? 's' : ''}</p>
                       </div>
                     </div>
                   </div>

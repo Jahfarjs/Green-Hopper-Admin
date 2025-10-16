@@ -1,5 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { PlusIcon, PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { 
+  PlusIcon, 
+  PencilIcon, 
+  TrashIcon, 
+  EyeIcon,
+  ChartBarIcon,
+  CubeIcon,
+  BuildingOfficeIcon,
+  TruckIcon,
+  AdjustmentsHorizontalIcon,
+  CurrencyDollarIcon,
+  BanknotesIcon,
+  ClipboardDocumentListIcon,
+  ExclamationTriangleIcon,
+  XMarkIcon
+} from '@heroicons/react/24/outline';
 
 const ExpenditureManagementPage = () => {
   const [expenditures, setExpenditures] = useState([]);
@@ -16,11 +31,20 @@ const ExpenditureManagementPage = () => {
   const [expenditureBreakdown, setExpenditureBreakdown] = useState({
     roomCost: 0,
     extraBedCost: 0,
+    vehicleCost: 0,
     additionalServices: 0,
     totalExpenditure: 0,
     originalCurrency: 'USD',
+    vehicleCurrency: 'USD',
     convertedCurrency: 'INR',
-    exchangeRate: 83
+    exchangeRate: 83,
+    services: {
+      cialParking: 0,
+      cialEntry: 0,
+      bouquet: 0,
+      simCard: 0,
+      food: 0
+    }
   });
   const [manualExchangeRate, setManualExchangeRate] = useState(83);
   const [useManualRate, setUseManualRate] = useState(false);
@@ -28,8 +52,31 @@ const ExpenditureManagementPage = () => {
   const [itemsPerPage] = useState(5);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedExpenditure, setSelectedExpenditure] = useState(null);
+  const [deleteDialog, setDeleteDialog] = useState({
+    isOpen: false,
+    expenditureId: null,
+    expenditureName: ''
+  });
 
   const API_BASE_URL = import.meta.env.VITE_ADMIN_API_URL;
+
+  const currencies = [
+    { value: 'USD', label: 'USD ($)', symbol: '$' },
+    { value: 'EUR', label: 'EUR (€)', symbol: '€' },
+    { value: 'GBP', label: 'GBP (£)', symbol: '£' },
+    { value: 'INR', label: 'INR (₹)', symbol: '₹' },
+    { value: 'MYR', label: 'MYR (RM)', symbol: 'RM' },
+    { value: 'LKR', label: 'LKR (Rs)', symbol: 'Rs' },
+    { value: 'AED', label: 'AED (د.إ)', symbol: 'د.إ' },
+    { value: 'SGD', label: 'SGD (S$)', symbol: 'S$' },
+    { value: 'JPY', label: 'JPY (¥)', symbol: '¥' },
+    { value: 'AUD', label: 'AUD (A$)', symbol: 'A$' }
+  ];
+
+  const getCurrencySymbol = (currencyCode) => {
+    const currency = currencies.find(c => c.value === currencyCode);
+    return currency ? currency.symbol : '$';
+  };
 
   useEffect(() => {
     fetchExpenditures();
@@ -44,10 +91,8 @@ const ExpenditureManagementPage = () => {
         const data = await response.json();
         setExpenditures(data);
       } else {
-        console.error('Failed to fetch expenditures');
       }
     } catch (error) {
-      console.error('Error fetching expenditures:', error);
     } finally {
       setLoading(false);
     }
@@ -62,7 +107,6 @@ const ExpenditureManagementPage = () => {
         setPackages(data);
       }
     } catch (error) {
-      console.error('Error fetching packages:', error);
     }
   };
 
@@ -109,7 +153,6 @@ const ExpenditureManagementPage = () => {
         alert(error.message || 'Failed to save expenditure');
       }
     } catch (error) {
-      console.error('Error saving expenditure:', error);
       alert('Failed to save expenditure');
     }
   };
@@ -125,14 +168,18 @@ const ExpenditureManagementPage = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this expenditure?')) {
-      return;
-    }
+  const handleDeleteClick = (expenditure) => {
+    setDeleteDialog({
+      isOpen: true,
+      expenditureId: expenditure._id,
+      expenditureName: expenditure.package?.packageName || 'Unknown Package'
+    });
+  };
 
+  const handleDeleteConfirm = async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/expenditures/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/expenditures/${deleteDialog.expenditureId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -141,14 +188,14 @@ const ExpenditureManagementPage = () => {
       });
 
       if (response.ok) {
-        setExpenditures(expenditures.filter(exp => exp._id !== id));
+        setExpenditures(expenditures.filter(exp => exp._id !== deleteDialog.expenditureId));
         // Refresh the expenditures list
         fetchExpenditures();
+        setDeleteDialog({ isOpen: false, expenditureId: null, expenditureName: '' });
       } else {
         alert('Failed to delete expenditure');
       }
     } catch (error) {
-      console.error('Error deleting expenditure:', error);
       alert('Failed to delete expenditure');
     }
   };
@@ -215,85 +262,193 @@ const ExpenditureManagementPage = () => {
   const calculateExpenditure = (selectedPackage, customExchangeRate = null) => {
     if (!selectedPackage) return { totalExpenditure: 0, breakdown: {} };
 
-    // Calculate nights stayed
-    const nights = calculateNights(selectedPackage.checkinDate, selectedPackage.checkoutDate);
-    
-    // Get room category rate from selected hotel
-    const selectedHotel = selectedPackage.hotelName;
-    let roomRate = 0;
-    let hotelCurrency = 'USD'; // Default hotel currency
-    
-    if (selectedHotel && selectedHotel.roomCategories) {
-      const roomCategory = selectedHotel.roomCategories.find(
-        cat => cat.category === selectedPackage.roomCategory
-      );
-      if (roomCategory) {
-        roomRate = parseFloat(roomCategory.rate) || 0;
-      }
-      // Get hotel currency
-      hotelCurrency = selectedHotel.currency || 'USD';
-    }
+    // Handle multiple hotels or single hotel
+    const hotelEntries = selectedPackage.hotelEntries && selectedPackage.hotelEntries.length > 0 
+      ? selectedPackage.hotelEntries 
+      : [{
+          hotelName: selectedPackage.hotelName,
+          checkinDate: selectedPackage.checkinDate,
+          checkoutDate: selectedPackage.checkoutDate,
+          noOfRooms: selectedPackage.noOfRooms,
+          roomCategory: selectedPackage.roomCategory,
+          noOfExtraBed: selectedPackage.noOfExtraBed
+        }];
 
-    // Calculate exchange rate if needed
-    const packageCurrency = selectedPackage.currency || 'INR';
-    const exchangeRate = customExchangeRate || (useManualRate ? manualExchangeRate : calculateExchangeRate(
-      selectedPackage.packagePrice, 
-      packageCurrency, 
-      hotelCurrency
-    ));
-    
-    // Debug logging for currency conversion
-    if (packageCurrency !== hotelCurrency) {
-      console.log(`Currency Conversion: ${hotelCurrency} → ${packageCurrency}`);
-      console.log(`Exchange Rate: ${exchangeRate}`);
-      console.log(`Package Price: ${selectedPackage.packagePrice} ${packageCurrency}`);
-    }
+    let totalRoomCost = 0;
+    let totalExtraBedCost = 0;
+    let totalNights = 0;
+    let hotelBreakdowns = [];
 
-    // Calculate room cost (nights * room rate * number of rooms)
-    const noOfRooms = parseInt(selectedPackage.noOfRooms) || 1;
-    let roomCost = nights * roomRate * noOfRooms;
-    const originalRoomCost = roomCost;
-    
-    // Convert room cost to package currency if needed
-    if (packageCurrency !== hotelCurrency) {
-      if (packageCurrency === 'INR' && hotelCurrency === 'USD') {
-        // Convert USD to INR
-        roomCost = roomCost * exchangeRate;
-        console.log(`Room Cost: ${originalRoomCost} ${hotelCurrency} → ${roomCost} ${packageCurrency}`);
-      } else if (packageCurrency === 'USD' && hotelCurrency === 'INR') {
-        // Convert INR to USD
-        roomCost = roomCost / exchangeRate;
-        console.log(`Room Cost: ${originalRoomCost} ${hotelCurrency} → ${roomCost} ${packageCurrency}`);
+    // Calculate costs for each hotel entry
+    hotelEntries.forEach((hotelEntry, index) => {
+      // Calculate nights for this hotel entry
+      const nights = calculateNights(hotelEntry.checkinDate, hotelEntry.checkoutDate);
+      totalNights += nights;
+      
+      // Get room category rate from selected hotel
+      const selectedHotel = hotelEntry.hotelName;
+      let roomRate = 0;
+      let hotelCurrency = 'USD'; // Default hotel currency
+      
+      // Debug logging to understand the data structure
+      
+      if (selectedHotel && selectedHotel.roomCategories) {
+        const roomCategory = selectedHotel.roomCategories.find(
+          cat => cat.category === hotelEntry.roomCategory
+        );
+        if (roomCategory) {
+          roomRate = parseFloat(roomCategory.rate) || 0;
+        } else {
+        }
+        // Get hotel currency
+        hotelCurrency = selectedHotel.currency || 'USD';
+      } else {
+        // If no hotel data, try to get rates from package level
+        if (selectedPackage.hotelName && selectedPackage.hotelName.roomCategories) {
+          const roomCategory = selectedPackage.hotelName.roomCategories.find(
+            cat => cat.category === hotelEntry.roomCategory
+          );
+          if (roomCategory) {
+            roomRate = parseFloat(roomCategory.rate) || 0;
+            hotelCurrency = selectedPackage.hotelName.currency || 'USD';
+          }
+        }
+        
+        // If still no rate found, use default rates based on room category
+        if (roomRate === 0) {
+          const defaultRates = {
+            'C1': 100, 'C2': 150, 'C3': 200, 'C4': 250, 'C5': 300,
+            'Standard': 100, 'Deluxe': 150, 'Premium': 200, 'Suite': 300
+          };
+          roomRate = defaultRates[hotelEntry.roomCategory] || 100; // Default to 100 if category not found
+        }
       }
-    }
 
-    // Calculate extra bed cost
-    const noOfExtraBeds = parseInt(selectedPackage.noOfExtraBed) || 0;
-    let extraBedRate = 50; // Default rate
-    
-    // Get extra bed rate from hotel if available
-    if (selectedHotel && selectedHotel.roomCategories) {
-      const roomCategory = selectedHotel.roomCategories.find(
-        cat => cat.category === selectedPackage.roomCategory
-      );
-      if (roomCategory && roomCategory.extraBedRate) {
-        extraBedRate = parseFloat(roomCategory.extraBedRate) || 50;
+      // Calculate exchange rate if needed
+      const packageCurrency = selectedPackage.currency || 'INR';
+      const exchangeRate = customExchangeRate || (useManualRate ? manualExchangeRate : calculateExchangeRate(
+        selectedPackage.packagePrice, 
+        packageCurrency, 
+        hotelCurrency
+      ));
+      
+      // Debug logging for currency conversion
+      if (packageCurrency !== hotelCurrency) {
       }
-    }
+
+      // Calculate room cost (nights * room rate * number of rooms)
+      const noOfRooms = parseInt(hotelEntry.noOfRooms) || 1;
+      let roomCost = nights * roomRate * noOfRooms;
+      const originalRoomCost = roomCost;
+      
+      // Convert room cost to package currency if needed
+      if (packageCurrency !== hotelCurrency) {
+        if (packageCurrency === 'INR' && hotelCurrency === 'USD') {
+          // Convert USD to INR
+          roomCost = roomCost * exchangeRate;
+        } else if (packageCurrency === 'USD' && hotelCurrency === 'INR') {
+          // Convert INR to USD
+          roomCost = roomCost / exchangeRate;
+        }
+      }
+
+      // Calculate extra bed cost
+      const noOfExtraBeds = parseInt(hotelEntry.noOfExtraBed) || 0;
+      let extraBedRate = 50; // Default rate
+      
+      // Get extra bed rate from hotel if available
+      if (selectedHotel && selectedHotel.roomCategories) {
+        const roomCategory = selectedHotel.roomCategories.find(
+          cat => cat.category === hotelEntry.roomCategory
+        );
+        if (roomCategory && roomCategory.extraBedRate) {
+          extraBedRate = parseFloat(roomCategory.extraBedRate) || 50;
+        }
+      } else if (selectedPackage.hotelName && selectedPackage.hotelName.roomCategories) {
+        // Try package level hotel data
+        const roomCategory = selectedPackage.hotelName.roomCategories.find(
+          cat => cat.category === hotelEntry.roomCategory
+        );
+        if (roomCategory && roomCategory.extraBedRate) {
+          extraBedRate = parseFloat(roomCategory.extraBedRate) || 50;
+        }
+      }
+      
+      // Use default extra bed rates if still not found
+      if (extraBedRate === 50) {
+        const defaultExtraBedRates = {
+          'C1': 30, 'C2': 40, 'C3': 50, 'C4': 60, 'C5': 70,
+          'Standard': 30, 'Deluxe': 40, 'Premium': 50, 'Suite': 70
+        };
+        extraBedRate = defaultExtraBedRates[hotelEntry.roomCategory] || 50;
+      }
+      
+      let extraBedCost = nights * noOfExtraBeds * extraBedRate;
+      const originalExtraBedCost = extraBedCost;
+      
+      // Convert extra bed cost to package currency if needed
+      if (packageCurrency !== hotelCurrency) {
+        if (packageCurrency === 'INR' && hotelCurrency === 'USD') {
+          // Convert USD to INR
+          extraBedCost = extraBedCost * exchangeRate;
+        } else if (packageCurrency === 'USD' && hotelCurrency === 'INR') {
+          // Convert INR to USD
+          extraBedCost = extraBedCost / exchangeRate;
+        }
+      }
+
+      // Add to totals
+      totalRoomCost += roomCost;
+      totalExtraBedCost += extraBedCost;
+
+      // Store breakdown for this hotel
+      hotelBreakdowns.push({
+        hotelName: selectedHotel?.hotelName || hotelEntry.hotelName?.hotelName || 'Hotel ' + (index + 1),
+        nights: nights,
+        noOfRooms: noOfRooms,
+        roomRate: roomRate,
+        roomCost: Math.round(roomCost),
+        originalRoomCost: Math.round(originalRoomCost),
+        noOfExtraBeds: noOfExtraBeds,
+        extraBedRate: extraBedRate,
+        extraBedCost: Math.round(extraBedCost),
+        originalExtraBedCost: Math.round(originalExtraBedCost),
+        hotelCurrency: hotelCurrency,
+        exchangeRate: exchangeRate,
+        roomCategory: hotelEntry.roomCategory,
+        destination: hotelEntry.destination?.destinationName || 'N/A'
+      });
+    });
+
+    // Calculate vehicle cost (based on total nights across all hotels)
+    let vehicleCost = 0;
+    let vehicleCurrency = 'USD'; // Default vehicle currency
+    let originalVehicleCost = 0;
     
-    let extraBedCost = nights * noOfExtraBeds * extraBedRate;
-    const originalExtraBedCost = extraBedCost;
-    
-    // Convert extra bed cost to package currency if needed
-    if (packageCurrency !== hotelCurrency) {
-      if (packageCurrency === 'INR' && hotelCurrency === 'USD') {
-        // Convert USD to INR
-        extraBedCost = extraBedCost * exchangeRate;
-        console.log(`Extra Bed Cost: ${originalExtraBedCost} ${hotelCurrency} → ${extraBedCost} ${packageCurrency}`);
-      } else if (packageCurrency === 'USD' && hotelCurrency === 'INR') {
-        // Convert INR to USD
-        extraBedCost = extraBedCost / exchangeRate;
-        console.log(`Extra Bed Cost: ${originalExtraBedCost} ${hotelCurrency} → ${extraBedCost} ${packageCurrency}`);
+    if (selectedPackage.vehicle) {
+      // Get vehicle rate from the vehicle reference
+      const vehicleRate = parseFloat(selectedPackage.vehicle.vehicleRatePerDay) || 0;
+      vehicleCurrency = selectedPackage.vehicle.currency || 'USD';
+      vehicleCost = totalNights * vehicleRate;
+      originalVehicleCost = vehicleCost;
+      
+      // Use the exchange rate from the first hotel (assuming all hotels use same currency)
+      const packageCurrency = selectedPackage.currency || 'INR';
+      const exchangeRate = customExchangeRate || (useManualRate ? manualExchangeRate : calculateExchangeRate(
+        selectedPackage.packagePrice, 
+        packageCurrency, 
+        vehicleCurrency
+      ));
+      
+      // Convert vehicle cost to package currency if needed
+      if (packageCurrency !== vehicleCurrency) {
+        if (packageCurrency === 'INR' && vehicleCurrency === 'USD') {
+          // Convert USD to INR
+          vehicleCost = vehicleCost * exchangeRate;
+        } else if (packageCurrency === 'USD' && vehicleCurrency === 'INR') {
+          // Convert INR to USD
+          vehicleCost = vehicleCost / exchangeRate;
+        }
       }
     }
 
@@ -307,31 +462,27 @@ const ExpenditureManagementPage = () => {
     ];
 
     const additionalServicesTotal = additionalServices.reduce((sum, rate) => sum + rate, 0);
-    const totalExpenditure = roomCost + extraBedCost + additionalServicesTotal;
+    const totalExpenditure = totalRoomCost + totalExtraBedCost + vehicleCost + additionalServicesTotal;
 
     // Final logging for total expenditure
-    if (packageCurrency !== hotelCurrency) {
-      console.log(`Total Expenditure: ${Math.round(totalExpenditure)} ${packageCurrency}`);
-      console.log(`Package Price: ${selectedPackage.packagePrice} ${packageCurrency}`);
-      console.log(`Calculated Profit: ${Math.round(parseFloat(selectedPackage.packagePrice) - totalExpenditure)} ${packageCurrency}`);
-    }
+    const packageCurrency = selectedPackage.currency || 'INR';
 
     return {
       totalExpenditure: Math.round(totalExpenditure),
       breakdown: {
-        roomCost: Math.round(roomCost),
-        extraBedCost: Math.round(extraBedCost),
+        roomCost: Math.round(totalRoomCost),
+        extraBedCost: Math.round(totalExtraBedCost),
+        vehicleCost: Math.round(vehicleCost),
         additionalServices: Math.round(additionalServicesTotal),
-        originalRoomCost: Math.round(originalRoomCost),
-        originalExtraBedCost: Math.round(originalExtraBedCost),
-        originalCurrency: hotelCurrency,
+        originalVehicleCost: Math.round(originalVehicleCost),
+        vehicleCurrency: vehicleCurrency,
         convertedCurrency: packageCurrency,
-        exchangeRate: exchangeRate,
-        nights: nights,
-        noOfRooms: noOfRooms,
-        noOfExtraBeds: noOfExtraBeds,
-        roomRate: roomRate,
-        extraBedRate: extraBedRate,
+        nights: totalNights,
+        vehicleRate: selectedPackage.vehicle ? parseFloat(selectedPackage.vehicle.vehicleRatePerDay) || 0 : 0,
+        vehicleName: selectedPackage.vehicle ? selectedPackage.vehicle.vehicleName : 'N/A',
+        vehicleType: selectedPackage.vehicle ? selectedPackage.vehicle.vehicleType : 'N/A',
+        hotelBreakdowns: hotelBreakdowns,
+        totalHotels: hotelEntries.length,
         services: {
           cialParking: parseFloat(selectedPackage.cialParkingRate) || 0,
           cialEntry: parseFloat(selectedPackage.cialEntryRate) || 0,
@@ -377,11 +528,20 @@ const ExpenditureManagementPage = () => {
       setExpenditureBreakdown({
         roomCost: 0,
         extraBedCost: 0,
+        vehicleCost: 0,
         additionalServices: 0,
         totalExpenditure: 0,
         originalCurrency: 'USD',
+        vehicleCurrency: 'USD',
         convertedCurrency: 'INR',
-        exchangeRate: 83
+        exchangeRate: 83,
+        services: {
+          cialParking: 0,
+          cialEntry: 0,
+          bouquet: 0,
+          simCard: 0,
+          food: 0
+        }
       });
     }
   };
@@ -422,8 +582,10 @@ const ExpenditureManagementPage = () => {
   };
 
   const handleViewDetails = (expenditure) => {
-    console.log('Selected expenditure data:', expenditure);
-    console.log('Package data:', expenditure.package);
+    if (expenditure.package?.hotelEntries) {
+      expenditure.package.hotelEntries.forEach((entry, index) => {
+      });
+    }
     setSelectedExpenditure(expenditure);
     setShowDetailsModal(true);
   };
@@ -442,7 +604,7 @@ const ExpenditureManagementPage = () => {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 pb-24">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-white">Expenditure Management</h1>
         <button
@@ -478,6 +640,11 @@ const ExpenditureManagementPage = () => {
                     <div className="text-sm text-white/60">
                       {expenditure.package?.nameOfGuest}
                     </div>
+                    {expenditure.package?.hotelEntries && expenditure.package.hotelEntries.length > 0 && (
+                      <div className="text-xs text-green-400 mt-1">
+                        {expenditure.package.hotelEntries.length} Hotel{expenditure.package.hotelEntries.length > 1 ? 's' : ''}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                     {expenditure.packageExpenditure}
@@ -522,7 +689,7 @@ const ExpenditureManagementPage = () => {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDelete(expenditure._id);
+                          handleDeleteClick(expenditure);
                         }}
                         className="text-red-400 hover:text-red-300 transition-colors"
                         title="Delete"
@@ -537,7 +704,7 @@ const ExpenditureManagementPage = () => {
                 <tr>
                   <td colSpan="5" className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center justify-center space-y-3">
-                      <div className="text-4xl text-white/30">📊</div>
+                      <ChartBarIcon className="h-12 w-12 text-white/30 mx-auto" />
                       <div className="text-lg text-white/60 font-medium">No expenditures found</div>
                       <div className="text-sm text-white/40">Start by adding your first expenditure</div>
                     </div>
@@ -677,66 +844,128 @@ const ExpenditureManagementPage = () => {
                       placeholder="Select a package to auto-calculate"
                     />
                     <p className="text-xs text-white/50 mt-1">
-                      Calculated from: Room cost + Extra beds + Additional services
+                      Calculated from: Room cost + Extra beds + Vehicle cost + Additional services
                     </p>
                   </div>
 
-                  {/* Room Cost Details - Left Column */}
-                  {formData.package && formData.packageExpenditure && (
+                  {/* Hotel Cost Details - Left Column */}
+                  {formData.package && formData.packageExpenditure && expenditureBreakdown.hotelBreakdowns && (
                     <div className="p-4 bg-[#1a1a1a]/50 rounded border border-green-500/20">
                       <div className="font-medium text-green-400 mb-3 flex items-center">
-                        <span className="mr-2">🏨</span> Room Cost Details
+                        <BuildingOfficeIcon className="h-5 w-5 mr-2 inline" /> Hotel Cost Details ({expenditureBreakdown.totalHotels} Hotel{expenditureBreakdown.totalHotels > 1 ? 's' : ''})
                       </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between">
-                          <span className="text-sm">Nights:</span>
-                          <span className="font-medium text-green-300">{expenditureBreakdown.nights}</span>
+                      {expenditureBreakdown.hotelBreakdowns.some(hotel => hotel.hotelName.startsWith('Hotel ')) && (
+                        <div className="mb-3 p-2 bg-yellow-900/20 border border-yellow-500/30 rounded text-xs text-yellow-300">
+                          <ExclamationTriangleIcon className="h-4 w-4 inline mr-1" /> Some hotels are using default rates because hotel data is missing. Please ensure hotel information is properly configured in the package.
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">Rooms:</span>
-                          <span className="font-medium text-green-300">{expenditureBreakdown.noOfRooms}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-sm">Rate:</span>
-                          <span className="font-medium text-green-300">{expenditureBreakdown.roomRate} {expenditureBreakdown.originalCurrency}/night</span>
-                        </div>
+                      )}
+                      <div className="space-y-3">
+                        {expenditureBreakdown.hotelBreakdowns.map((hotel, index) => (
+                          <div key={index} className="p-3 bg-[#0f1310]/50 rounded border border-green-500/10">
+                            <div className="font-medium text-green-300 text-sm mb-2">
+                              Hotel {index + 1}: {hotel.hotelName}
+                              {hotel.hotelName === 'Hotel ' + (index + 1) && (
+                                <span className="text-yellow-400 text-xs ml-2">(Using Default Rates)</span>
+                              )}
+                            </div>
+                            <div className="space-y-1 text-xs">
+                              <div className="flex justify-between">
+                                <span>Nights:</span>
+                                <span className="text-green-300">{hotel.nights}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Rooms:</span>
+                                <span className="text-green-300">{hotel.noOfRooms}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Room Rate:</span>
+                                <span className="text-green-300">{hotel.roomRate} {hotel.hotelCurrency}/night</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Extra Beds:</span>
+                                <span className="text-green-300">{hotel.noOfExtraBeds}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Extra Bed Rate:</span>
+                                <span className="text-green-300">{hotel.extraBedRate} {hotel.hotelCurrency}/night</span>
+                              </div>
+                              {hotel.hotelCurrency !== expenditureBreakdown.convertedCurrency && (
+                                <div className="flex justify-between">
+                                  <span>Exchange Rate:</span>
+                                  <span className="text-yellow-300">1 {hotel.hotelCurrency} = {hotel.exchangeRate} {expenditureBreakdown.convertedCurrency}</span>
+                                </div>
+                              )}
+                              <div className="border-t border-green-500/20 pt-1 mt-2">
+                                <div className="flex justify-between text-xs">
+                                  <span>Original Room Cost:</span>
+                                  <span className="text-blue-300">{hotel.originalRoomCost} {hotel.hotelCurrency}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                  <span>Converted Room Cost:</span>
+                                  <span className="text-green-300">{hotel.roomCost} {expenditureBreakdown.convertedCurrency}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                  <span>Original Extra Bed Cost:</span>
+                                  <span className="text-blue-300">{hotel.originalExtraBedCost} {hotel.hotelCurrency}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
+                                  <span>Converted Extra Bed Cost:</span>
+                                  <span className="text-green-300">{hotel.extraBedCost} {expenditureBreakdown.convertedCurrency}</span>
+                                </div>
+                                <div className="flex justify-between text-xs font-medium border-t border-green-500/20 pt-1 mt-1">
+                                  <span>Hotel Total:</span>
+                                  <span className="text-green-300">{hotel.roomCost + hotel.extraBedCost} {expenditureBreakdown.convertedCurrency}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                         <div className="border-t border-green-500/20 pt-2 mt-3">
                           <div className="flex justify-between text-sm">
-                            <span>Original:</span>
-                            <span className="text-yellow-300">{expenditureBreakdown.originalRoomCost} {expenditureBreakdown.originalCurrency}</span>
+                            <span>Total Nights:</span>
+                            <span className="text-yellow-300">{expenditureBreakdown.nights}</span>
                           </div>
-                          <div className="flex justify-between text-sm font-medium">
-                            <span>Converted:</span>
+                          <div className="flex justify-between text-sm">
+                            <span>Total Room Cost:</span>
                             <span className="text-green-300">{expenditureBreakdown.roomCost} {expenditureBreakdown.convertedCurrency}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Total Extra Bed Cost:</span>
+                            <span className="text-green-300">{expenditureBreakdown.extraBedCost} {expenditureBreakdown.convertedCurrency}</span>
+                          </div>
+                          <div className="flex justify-between text-sm font-medium border-t border-green-500/20 pt-1 mt-1">
+                            <span>Total Hotel Cost:</span>
+                            <span className="text-green-300">{expenditureBreakdown.roomCost + expenditureBreakdown.extraBedCost} {expenditureBreakdown.convertedCurrency}</span>
                           </div>
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Extra Bed Cost Details - Left Column */}
-                  {formData.package && formData.packageExpenditure && (
-                    <div className="p-4 bg-[#1a1a1a]/50 rounded border border-blue-500/20">
-                      <div className="font-medium text-blue-400 mb-3 flex items-center">
-                        <span className="mr-2">🛏️</span> Extra Bed Cost Details
+
+                  {/* Vehicle Cost Details - Left Column */}
+                  {formData.package && formData.packageExpenditure && expenditureBreakdown.vehicleCost > 0 && (
+                    <div className="p-4 bg-[#1a1a1a]/50 rounded border border-orange-500/20">
+                      <div className="font-medium text-orange-400 mb-3 flex items-center">
+                        <TruckIcon className="h-5 w-5 mr-2 inline" /> Vehicle Cost Details
                       </div>
                       <div className="space-y-2">
                         <div className="flex justify-between">
-                          <span className="text-sm">Extra Beds:</span>
-                          <span className="font-medium text-blue-300">{expenditureBreakdown.noOfExtraBeds}</span>
+                          <span className="text-sm">Vehicle:</span>
+                          <span className="font-medium text-orange-300">{expenditureBreakdown.vehicleName} ({expenditureBreakdown.vehicleType})</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm">Rate:</span>
-                          <span className="font-medium text-blue-300">{expenditureBreakdown.extraBedRate} {expenditureBreakdown.originalCurrency}/night</span>
+                          <span className="font-medium text-orange-300">{expenditureBreakdown.vehicleRate} {expenditureBreakdown.vehicleCurrency}/day</span>
                         </div>
-                        <div className="border-t border-blue-500/20 pt-2 mt-3">
+                        <div className="border-t border-orange-500/20 pt-2 mt-3">
                           <div className="flex justify-between text-sm">
                             <span>Original:</span>
-                            <span className="text-yellow-300">{expenditureBreakdown.originalExtraBedCost} {expenditureBreakdown.originalCurrency}</span>
+                            <span className="text-yellow-300">{expenditureBreakdown.originalVehicleCost} {expenditureBreakdown.vehicleCurrency}</span>
                           </div>
                           <div className="flex justify-between text-sm font-medium">
                             <span>Converted:</span>
-                            <span className="text-blue-300">{expenditureBreakdown.extraBedCost} {expenditureBreakdown.convertedCurrency}</span>
+                            <span className="text-orange-300">{expenditureBreakdown.vehicleCost} {expenditureBreakdown.convertedCurrency}</span>
                           </div>
                         </div>
                       </div>
@@ -799,28 +1028,28 @@ const ExpenditureManagementPage = () => {
                   {formData.package && formData.packageExpenditure && (
                     <div className="p-4 bg-[#1a1a1a]/50 rounded border border-purple-500/20">
                       <div className="font-medium text-purple-400 mb-3 flex items-center">
-                        <span className="mr-2">🎯</span> Additional Services Details
+                        <AdjustmentsHorizontalIcon className="h-5 w-5 mr-2 inline" /> Additional Services Details
                       </div>
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span>CIAL Parking:</span>
-                          <span className="text-purple-300">{expenditureBreakdown.services.cialParking} {expenditureBreakdown.convertedCurrency}</span>
+                          <span className="text-purple-300">{expenditureBreakdown.services?.cialParking || 0} {expenditureBreakdown.convertedCurrency}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>CIAL Entry:</span>
-                          <span className="text-purple-300">{expenditureBreakdown.services.cialEntry} {expenditureBreakdown.convertedCurrency}</span>
+                          <span className="text-purple-300">{expenditureBreakdown.services?.cialEntry || 0} {expenditureBreakdown.convertedCurrency}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>Bouquet:</span>
-                          <span className="text-purple-300">{expenditureBreakdown.services.bouquet} {expenditureBreakdown.convertedCurrency}</span>
+                          <span className="text-purple-300">{expenditureBreakdown.services?.bouquet || 0} {expenditureBreakdown.convertedCurrency}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>SIM Card:</span>
-                          <span className="text-purple-300">{expenditureBreakdown.services.simCard} {expenditureBreakdown.convertedCurrency}</span>
+                          <span className="text-purple-300">{expenditureBreakdown.services?.simCard || 0} {expenditureBreakdown.convertedCurrency}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>Food:</span>
-                          <span className="text-purple-300">{expenditureBreakdown.services.food} {expenditureBreakdown.convertedCurrency}</span>
+                          <span className="text-purple-300">{expenditureBreakdown.services?.food || 0} {expenditureBreakdown.convertedCurrency}</span>
                         </div>
                         <div className="border-t border-purple-500/20 pt-2 mt-3">
                           <div className="flex justify-between text-sm font-medium">
@@ -836,7 +1065,7 @@ const ExpenditureManagementPage = () => {
                   {formData.package && formData.packageExpenditure && (
                     <div className="p-4 bg-[#1a1a1a]/30 border border-[#5B8424]/30 rounded-lg">
                       <div className="font-medium text-white mb-3 flex items-center">
-                        <span className="mr-2">📋</span> Expenditure Summary
+                        <ClipboardDocumentListIcon className="h-5 w-5 mr-2 inline" /> Expenditure Summary
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="text-center p-3 bg-green-900/20 border border-green-500/30 rounded">
@@ -849,12 +1078,19 @@ const ExpenditureManagementPage = () => {
                           <div className="text-lg font-bold text-blue-400">{expenditureBreakdown.extraBedCost}</div>
                           <div className="text-xs text-white/60">{expenditureBreakdown.convertedCurrency}</div>
                         </div>
+                        {expenditureBreakdown.vehicleCost > 0 && (
+                          <div className="text-center p-3 bg-orange-900/20 border border-orange-500/30 rounded">
+                            <div className="text-xs text-orange-300 mb-1">Vehicle</div>
+                            <div className="text-lg font-bold text-orange-400">{expenditureBreakdown.vehicleCost}</div>
+                            <div className="text-xs text-white/60">{expenditureBreakdown.convertedCurrency}</div>
+                          </div>
+                        )}
                         <div className="text-center p-3 bg-purple-900/20 border border-purple-500/30 rounded">
                           <div className="text-xs text-purple-300 mb-1">Services</div>
                           <div className="text-lg font-bold text-purple-400">{expenditureBreakdown.additionalServices}</div>
                           <div className="text-xs text-white/60">{expenditureBreakdown.convertedCurrency}</div>
                         </div>
-                        <div className="text-center p-3 bg-yellow-900/20 border border-yellow-500/30 rounded">
+                        <div className={`text-center p-3 bg-yellow-900/20 border border-yellow-500/30 rounded ${expenditureBreakdown.vehicleCost > 0 ? 'col-span-2' : 'col-span-2'}`}>
                           <div className="text-xs text-yellow-300 mb-1">Total</div>
                           <div className="text-lg font-bold text-yellow-400">{formData.packageExpenditure}</div>
                           <div className="text-xs text-white/60">{expenditureBreakdown.convertedCurrency}</div>
@@ -867,7 +1103,7 @@ const ExpenditureManagementPage = () => {
                   {formData.package && expenditureBreakdown.originalCurrency !== expenditureBreakdown.convertedCurrency && (
                     <div className="p-4 bg-yellow-900/20 border border-yellow-500/30 rounded">
                       <div className="font-medium text-yellow-400 mb-3 flex items-center">
-                        <span className="mr-2">💱</span> Currency Conversion Details
+                        <CurrencyDollarIcon className="h-5 w-5 mr-2 inline" /> Currency Conversion Details
                       </div>
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
@@ -893,7 +1129,7 @@ const ExpenditureManagementPage = () => {
                 <div className="p-4 bg-[#1a1a1a]/30 border border-[#5B8424]/30 rounded-lg">
                   <div className="flex items-center justify-between mb-4">
                     <label className="text-sm font-medium text-white/70 flex items-center">
-                      <span className="mr-2">💱</span> Manual Exchange Rate Control
+                      <CurrencyDollarIcon className="h-5 w-5 mr-2 inline" /> Manual Exchange Rate Control
                     </label>
                     <div className="flex items-center space-x-3">
                       <div className="flex items-center space-x-2">
@@ -1031,11 +1267,20 @@ const ExpenditureManagementPage = () => {
                     setExpenditureBreakdown({
                       roomCost: 0,
                       extraBedCost: 0,
+                      vehicleCost: 0,
                       additionalServices: 0,
                       totalExpenditure: 0,
                       originalCurrency: 'USD',
+                      vehicleCurrency: 'USD',
                       convertedCurrency: 'INR',
-                      exchangeRate: 83
+                      exchangeRate: 83,
+                      services: {
+                        cialParking: 0,
+                        cialEntry: 0,
+                        bouquet: 0,
+                        simCard: 0,
+                        food: 0
+                      }
                     });
                     setUseManualRate(false);
                     setManualExchangeRate(83);
@@ -1050,21 +1295,53 @@ const ExpenditureManagementPage = () => {
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
+      {deleteDialog.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              <div className="flex-shrink-0">
+                <TrashIcon className="w-8 h-8 text-red-500" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-lg font-medium text-white">Delete Expenditure</h3>
+                <p className="text-sm text-gray-400">
+                  Are you sure you want to delete expenditure for "{deleteDialog.expenditureName}"? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setDeleteDialog({ isOpen: false, expenditureId: null, expenditureName: '' })}
+                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteConfirm}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Details Modal */}
       {showDetailsModal && selectedExpenditure && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-[#121a14] rounded-lg border border-[#5B8424]/20 p-6 w-full max-w-4xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-bold text-white flex items-center">
-                <span className="mr-2">📊</span> Expenditure Details
+                <ChartBarIcon className="h-6 w-6 mr-2 inline" /> Expenditure Details
               </h2>
               <button
                 onClick={closeDetailsModal}
                 className="text-white/60 hover:text-white transition-colors"
               >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <XMarkIcon className="h-6 w-6" />
               </button>
             </div>
 
@@ -1073,7 +1350,7 @@ const ExpenditureManagementPage = () => {
               <div className="space-y-4">
                 <div className="p-4 bg-[#1a1a1a]/50 rounded border border-[#5B8424]/20">
                   <h3 className="text-lg font-semibold text-white mb-3 flex items-center">
-                    <span className="mr-2">📦</span> Package Information
+                    <CubeIcon className="h-6 w-6 mr-2 inline" /> Package Information
                   </h3>
                   <div className="space-y-2">
                     <div className="flex justify-between">
@@ -1103,48 +1380,104 @@ const ExpenditureManagementPage = () => {
                   </div>
                 </div>
 
-                <div className="p-4 bg-[#1a1a1a]/50 rounded border border-[#5B8424]/20">
-                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center">
-                    <span className="mr-2">🏨</span> Hotel Information
-                  </h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-white/70">Hotel Name:</span>
-                      <span className="text-white font-medium">{selectedExpenditure.package?.hotelName?.hotelName || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/70">Check-in:</span>
-                      <span className="text-white font-medium">
-                        {selectedExpenditure.package?.checkinDate ? new Date(selectedExpenditure.package.checkinDate).toLocaleDateString() : 'N/A'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/70">Check-out:</span>
-                      <span className="text-white font-medium">
-                        {selectedExpenditure.package?.checkoutDate ? new Date(selectedExpenditure.package.checkoutDate).toLocaleDateString() : 'N/A'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/70">Rooms:</span>
-                      <span className="text-white font-medium">{selectedExpenditure.package?.noOfRooms || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/70">Room Category:</span>
-                      <span className="text-white font-medium">{selectedExpenditure.package?.roomCategory || 'N/A'}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white/70">Extra Beds:</span>
-                      <span className="text-white font-medium">{selectedExpenditure.package?.noOfExtraBed || '0'}</span>
+                {/* Multiple Hotels Information */}
+                {selectedExpenditure.package?.hotelEntries && selectedExpenditure.package.hotelEntries.length > 0 ? (
+                  <div className="space-y-4">
+                    {selectedExpenditure.package.hotelEntries.map((hotelEntry, index) => (
+                      <div key={hotelEntry.id || index} className="p-4 bg-[#1a1a1a]/50 rounded border border-[#5B8424]/20">
+                        <h3 className="text-lg font-semibold text-white mb-3 flex items-center">
+                          <BuildingOfficeIcon className="h-6 w-6 mr-2 inline" /> Hotel {index + 1} Information
+                        </h3>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-white/70">Hotel Name:</span>
+                            <span className="text-white font-medium">{hotelEntry.hotelName?.hotelName || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-white/70">Destination:</span>
+                            <span className="text-white font-medium">{hotelEntry.destination?.destinationName || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-white/70">Check-in:</span>
+                            <span className="text-white font-medium">
+                              {hotelEntry.checkinDate ? new Date(hotelEntry.checkinDate).toLocaleDateString() : 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-white/70">Check-out:</span>
+                            <span className="text-white font-medium">
+                              {hotelEntry.checkoutDate ? new Date(hotelEntry.checkoutDate).toLocaleDateString() : 'N/A'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-white/70">Rooms:</span>
+                            <span className="text-white font-medium">{hotelEntry.noOfRooms || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-white/70">Room Category:</span>
+                            <span className="text-white font-medium">{hotelEntry.roomCategory || 'N/A'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-white/70">Extra Beds:</span>
+                            <span className="text-white font-medium">{hotelEntry.noOfExtraBed || '0'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-white/70">Nights:</span>
+                            <span className="text-white font-medium">
+                              {hotelEntry.checkinDate && hotelEntry.checkoutDate 
+                                ? calculateNights(hotelEntry.checkinDate, hotelEntry.checkoutDate)
+                                : 'N/A'
+                              }
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-4 bg-[#1a1a1a]/50 rounded border border-[#5B8424]/20">
+                    <h3 className="text-lg font-semibold text-white mb-3 flex items-center">
+                      <BuildingOfficeIcon className="h-6 w-6 mr-2 inline" /> Hotel Information
+                    </h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-white/70">Hotel Name:</span>
+                        <span className="text-white font-medium">{selectedExpenditure.package?.hotelName?.hotelName || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-white/70">Check-in:</span>
+                        <span className="text-white font-medium">
+                          {selectedExpenditure.package?.checkinDate ? new Date(selectedExpenditure.package.checkinDate).toLocaleDateString() : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-white/70">Check-out:</span>
+                        <span className="text-white font-medium">
+                          {selectedExpenditure.package?.checkoutDate ? new Date(selectedExpenditure.package.checkoutDate).toLocaleDateString() : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-white/70">Rooms:</span>
+                        <span className="text-white font-medium">{selectedExpenditure.package?.noOfRooms || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-white/70">Room Category:</span>
+                        <span className="text-white font-medium">{selectedExpenditure.package?.roomCategory || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-white/70">Extra Beds:</span>
+                        <span className="text-white font-medium">{selectedExpenditure.package?.noOfExtraBed || '0'}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Financial Information */}
               <div className="space-y-4">
                 <div className="p-4 bg-[#1a1a1a]/50 rounded border border-green-500/20">
                   <h3 className="text-lg font-semibold text-green-400 mb-3 flex items-center">
-                    <span className="mr-2">💰</span> Financial Summary
+                    <BanknotesIcon className="h-6 w-6 mr-2 inline" /> Financial Summary
                   </h3>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center p-3 bg-green-900/20 rounded">
@@ -1170,9 +1503,40 @@ const ExpenditureManagementPage = () => {
                   </div>
                 </div>
 
+                {/* Hotel Summary for Multiple Hotels */}
+                {selectedExpenditure.package?.hotelEntries && selectedExpenditure.package.hotelEntries.length > 1 && (
+                  <div className="p-4 bg-[#1a1a1a]/50 rounded border border-blue-500/20">
+                    <h3 className="text-lg font-semibold text-blue-400 mb-3 flex items-center">
+                      <BuildingOfficeIcon className="h-6 w-6 mr-2 inline" /> Hotels Summary
+                    </h3>
+                    <div className="space-y-2">
+                      {selectedExpenditure.package.hotelEntries.map((hotelEntry, index) => (
+                        <div key={hotelEntry.id || index} className="flex justify-between items-center p-2 bg-blue-900/20 rounded">
+                          <div className="flex flex-col">
+                            <span className="text-white font-medium text-sm">Hotel {index + 1}</span>
+                            <span className="text-white/60 text-xs">{hotelEntry.hotelName?.hotelName || 'N/A'}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-blue-300 text-sm">
+                              {hotelEntry.checkinDate && hotelEntry.checkoutDate 
+                                ? calculateNights(hotelEntry.checkinDate, hotelEntry.checkoutDate)
+                                : 'N/A'
+                              } nights
+                            </span>
+                            <div className="text-white/60 text-xs">
+                              {hotelEntry.noOfRooms} room{hotelEntry.noOfRooms > 1 ? 's' : ''}
+                              {hotelEntry.noOfExtraBed > 0 && `, ${hotelEntry.noOfExtraBed} extra bed${hotelEntry.noOfExtraBed > 1 ? 's' : ''}`}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="p-4 bg-[#1a1a1a]/50 rounded border border-purple-500/20">
                   <h3 className="text-lg font-semibold text-purple-400 mb-3 flex items-center">
-                    <span className="mr-2">🎯</span> Additional Services
+                    <AdjustmentsHorizontalIcon className="h-6 w-6 mr-2 inline" /> Additional Services
                   </h3>
                   <div className="space-y-2">
                     <div className="flex justify-between">
@@ -1200,7 +1564,7 @@ const ExpenditureManagementPage = () => {
 
                 <div className="p-4 bg-[#1a1a1a]/50 rounded border border-blue-500/20">
                   <h3 className="text-lg font-semibold text-blue-400 mb-3 flex items-center">
-                    <span className="mr-2">🚗</span> Transportation
+                    <TruckIcon className="h-6 w-6 mr-2 inline" /> Transportation
                   </h3>
                   <div className="space-y-2">
                     <div className="flex justify-between">
@@ -1212,8 +1576,20 @@ const ExpenditureManagementPage = () => {
                       <span className="text-white font-medium">{selectedExpenditure.package?.phoneNumberOfDriver || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-white/70">Vehicle Type:</span>
-                      <span className="text-white font-medium">{selectedExpenditure.package?.vehicleType || 'N/A'}</span>
+                      <span className="text-white/70">Vehicle:</span>
+                      <span className="text-white font-medium">
+                        {selectedExpenditure.package?.vehicle?.vehicleName || 'N/A'} 
+                        {selectedExpenditure.package?.vehicle?.vehicleType && ` (${selectedExpenditure.package.vehicle.vehicleType})`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/70">Vehicle Rate:</span>
+                      <span className="text-white font-medium">
+                        {selectedExpenditure.package?.vehicle?.vehicleRatePerDay 
+                          ? `${getCurrencySymbol(selectedExpenditure.package.vehicle.currency)}${selectedExpenditure.package.vehicle.vehicleRatePerDay}/day`
+                          : 'N/A'
+                        }
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/70">Registration:</span>

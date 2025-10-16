@@ -26,6 +26,7 @@ const PackageManagementPage = () => {
   const [showModal, setShowModal] = useState(false);
   const [editingPackage, setEditingPackage] = useState(null);
   const [hotels, setHotels] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
   const [destinations, setDestinations] = useState([]);
   const [nationalities, setNationalities] = useState([]);
   const [selectedHotel, setSelectedHotel] = useState(null);
@@ -34,6 +35,7 @@ const PackageManagementPage = () => {
   const [deleteDialog, setDeleteDialog] = useState({ isOpen: false, packageId: null, packageCode: '' });
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [showPackageDetails, setShowPackageDetails] = useState(false);
+  const [hotelEntries, setHotelEntries] = useState([]);
   const itemsPerPage = 10;
 
   const currencies = [
@@ -74,15 +76,8 @@ const PackageManagementPage = () => {
     packageCode: '',
     nameOfDriver: '',
     phoneNumberOfDriver: '',
-    vehicleType: '',
+    vehicle: '',
     regNumberOfVehicle: '',
-    hotelName: '',
-    destination: '',
-    checkinDate: '',
-    checkoutDate: '',
-    noOfRooms: '',
-    roomCategory: '',
-    noOfExtraBed: '',
     cialParkingRate: '',
     cialEntryRate: '',
     bouquetRate: '',
@@ -95,6 +90,7 @@ const PackageManagementPage = () => {
   useEffect(() => {
     fetchPackages();
     fetchHotels();
+    fetchVehicles();
     fetchDestinations();
     fetchNationalities();
   }, []);
@@ -115,7 +111,6 @@ const PackageManagementPage = () => {
         setPackages(data);
       }
     } catch (error) {
-      console.error('Error fetching packages:', error);
     } finally {
       setLoading(false);
     }
@@ -136,7 +131,18 @@ const PackageManagementPage = () => {
         setHotels(data);
       }
     } catch (error) {
-      console.error('Error fetching hotels:', error);
+    }
+  };
+
+  const fetchVehicles = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/vehicles/public`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setVehicles(data);
+      }
+    } catch (error) {
     }
   };
 
@@ -148,7 +154,6 @@ const PackageManagementPage = () => {
         setDestinations(data);
       }
     } catch (error) {
-      console.error('Error fetching destinations:', error);
     }
   };
 
@@ -164,7 +169,6 @@ const PackageManagementPage = () => {
         setNationalities(nationalityList);
       }
     } catch (error) {
-      console.error('Error fetching nationalities:', error);
       // Fallback to common nationalities if API fails
       setNationalities([
         { name: 'United States', demonym: 'American' },
@@ -181,19 +185,48 @@ const PackageManagementPage = () => {
     }
   };
 
-  const handleHotelChange = (hotelId) => {
-    const selectedHotelData = hotels.find(hotel => hotel._id === hotelId);
-    setSelectedHotel(selectedHotelData);
-    setRoomCategories(selectedHotelData?.roomCategories || []);
-    
-    // Auto-populate destination based on selected hotel
-    const hotelDestination = selectedHotelData?.destination?._id;
-    setFormData({
-      ...formData, 
-      hotelName: hotelId, 
-      destination: hotelDestination || '',
-      roomCategory: ''
-    });
+  // Hotel entries management functions
+  const addHotelEntry = () => {
+    const newEntry = {
+      id: Date.now(), // Simple unique ID
+      hotelName: '',
+      destination: '',
+      checkinDate: '',
+      checkoutDate: '',
+      noOfRooms: '',
+      roomCategory: '',
+      noOfExtraBed: ''
+    };
+    setHotelEntries([...hotelEntries, newEntry]);
+  };
+
+  const removeHotelEntry = (entryId) => {
+    setHotelEntries(hotelEntries.filter(entry => entry.id !== entryId));
+  };
+
+  const updateHotelEntry = (entryId, field, value) => {
+    setHotelEntries(hotelEntries.map(entry => {
+      if (entry.id === entryId) {
+        const updatedEntry = { ...entry, [field]: value };
+        
+        // Auto-populate destination when hotel is selected
+        if (field === 'hotelName') {
+          const selectedHotelData = hotels.find(hotel => hotel._id === value);
+          if (selectedHotelData) {
+            updatedEntry.destination = selectedHotelData.destination?._id || '';
+            updatedEntry.roomCategory = ''; // Reset room category
+          }
+        }
+        
+        return updatedEntry;
+      }
+      return entry;
+    }));
+  };
+
+  const getRoomCategoriesForHotel = (hotelId) => {
+    const hotel = hotels.find(h => h._id === hotelId);
+    return hotel?.roomCategories || [];
   };
 
   const handleSubmit = async (e) => {
@@ -207,7 +240,10 @@ const PackageManagementPage = () => {
       const method = editingPackage ? 'PUT' : 'POST';
       
       // Remove packageCode from form data for new packages (let backend generate it)
-      const submitData = { ...formData };
+      const submitData = { 
+        ...formData, 
+        hotelEntries: hotelEntries 
+      };
       if (!editingPackage) {
         delete submitData.packageCode;
       }
@@ -228,11 +264,9 @@ const PackageManagementPage = () => {
         fetchPackages();
       } else {
         const errorData = await response.json();
-        console.error('Error saving package:', errorData);
         alert(`Error: ${errorData.message}${errorData.missingFields ? '\nMissing fields: ' + errorData.missingFields.join(', ') : ''}`);
       }
     } catch (error) {
-      console.error('Error saving package:', error);
       alert('Error saving package: ' + error.message);
     }
   };
@@ -258,15 +292,8 @@ const PackageManagementPage = () => {
       packageCode: pkg.packageCode || '',
       nameOfDriver: pkg.nameOfDriver || '',
       phoneNumberOfDriver: pkg.phoneNumberOfDriver || '',
-      vehicleType: pkg.vehicleType || '',
+      vehicle: pkg.vehicle?._id || '',
       regNumberOfVehicle: pkg.regNumberOfVehicle || '',
-      hotelName: pkg.hotelName?._id || '',
-      destination: pkg.destination?._id || '',
-      checkinDate: pkg.checkinDate ? new Date(pkg.checkinDate).toISOString().split('T')[0] : '',
-      checkoutDate: pkg.checkoutDate ? new Date(pkg.checkoutDate).toISOString().split('T')[0] : '',
-      noOfRooms: pkg.noOfRooms || '',
-      roomCategory: pkg.roomCategory || '',
-      noOfExtraBed: pkg.noOfExtraBed || '',
       cialParkingRate: pkg.cialParkingRate || '',
       cialEntryRate: pkg.cialEntryRate || '',
       bouquetRate: pkg.bouquetRate || '',
@@ -275,6 +302,33 @@ const PackageManagementPage = () => {
       nameOfTourExecutive: pkg.nameOfTourExecutive || '',
       nameOfReservationOfficer: pkg.nameOfReservationOfficer || ''
     });
+    
+    // Populate hotel entries
+    if (pkg.hotelEntries && pkg.hotelEntries.length > 0) {
+      setHotelEntries(pkg.hotelEntries.map((entry, index) => ({
+        id: entry.id || Date.now() + index,
+        hotelName: entry.hotelName?._id || entry.hotelName || '',
+        destination: entry.destination?._id || entry.destination || '',
+        checkinDate: entry.checkinDate ? new Date(entry.checkinDate).toISOString().split('T')[0] : '',
+        checkoutDate: entry.checkoutDate ? new Date(entry.checkoutDate).toISOString().split('T')[0] : '',
+        noOfRooms: entry.noOfRooms || '',
+        roomCategory: entry.roomCategory || '',
+        noOfExtraBed: entry.noOfExtraBed || ''
+      })));
+    } else {
+      // Fallback for old packages with single hotel
+      setHotelEntries([{
+        id: Date.now(),
+        hotelName: pkg.hotelName?._id || '',
+        destination: pkg.destination?._id || '',
+        checkinDate: pkg.checkinDate ? new Date(pkg.checkinDate).toISOString().split('T')[0] : '',
+        checkoutDate: pkg.checkoutDate ? new Date(pkg.checkoutDate).toISOString().split('T')[0] : '',
+        noOfRooms: pkg.noOfRooms || '',
+        roomCategory: pkg.roomCategory || '',
+        noOfExtraBed: pkg.noOfExtraBed || ''
+      }]);
+    }
+    
     setShowModal(true);
   };
 
@@ -301,7 +355,6 @@ const PackageManagementPage = () => {
         setDeleteDialog({ isOpen: false, packageId: null, packageCode: '' });
       }
     } catch (error) {
-      console.error('Error deleting package:', error);
     }
   };
 
@@ -335,15 +388,8 @@ const PackageManagementPage = () => {
       packageCode: '',
       nameOfDriver: '',
       phoneNumberOfDriver: '',
-      vehicleType: '',
+      vehicle: '',
       regNumberOfVehicle: '',
-      hotelName: '',
-      destination: '',
-      checkinDate: '',
-      checkoutDate: '',
-      noOfRooms: '',
-      roomCategory: '',
-      noOfExtraBed: '',
       cialParkingRate: '',
       cialEntryRate: '',
       bouquetRate: '',
@@ -352,6 +398,7 @@ const PackageManagementPage = () => {
       nameOfTourExecutive: '',
       nameOfReservationOfficer: ''
     });
+    setHotelEntries([]);
   };
 
   const filteredPackages = packages.filter(pkg =>
@@ -480,7 +527,12 @@ const PackageManagementPage = () => {
                         </div>
                         <div className="flex items-center gap-2 text-gray-300">
                           <BuildingOfficeIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                          <span className="truncate">{pkg.hotelName?.hotelName}</span>
+                          <span className="truncate">
+                            {pkg.hotelEntries && pkg.hotelEntries.length > 0 
+                              ? `${pkg.hotelEntries.length} Hotel${pkg.hotelEntries.length > 1 ? 's' : ''}`
+                              : pkg.hotelName?.hotelName || 'N/A'
+                            }
+                          </span>
                         </div>
                         <div className="flex items-center gap-2 text-gray-300">
                           <MapPinIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
@@ -913,15 +965,21 @@ const PackageManagementPage = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Vehicle Type *
+                    Vehicle *
                   </label>
-                  <input
-                    type="text"
+                  <select
                     required
-                    value={formData.vehicleType}
-                    onChange={(e) => setFormData({...formData, vehicleType: e.target.value})}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                    value={formData.vehicle}
+                    onChange={(e) => setFormData({...formData, vehicle: e.target.value})}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Vehicle</option>
+                    {vehicles.map(vehicle => (
+                      <option key={vehicle._id} value={vehicle._id}>
+                        {vehicle.vehicleName} ({vehicle.vehicleType})
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
@@ -939,123 +997,171 @@ const PackageManagementPage = () => {
 
                 {/* Hotel Information */}
                 <div className="col-span-2">
-                  <h3 className="text-lg font-semibold mb-2 text-white mt-4">Hotel Information</h3>
+                  <h3 className="text-lg font-semibold mb-4 text-white mt-4">Hotel Information</h3>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Hotel *
-                  </label>
-                  <select
-                    required
-                    value={formData.hotelName}
-                    onChange={(e) => handleHotelChange(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select Hotel</option>
-                    {hotels.map(hotel => (
-                      <option key={hotel._id} value={hotel._id}>
-                        {hotel.hotelName} - {hotel.vehicleName}
-                      </option>
+                {hotelEntries.length === 0 ? (
+                  <div className="col-span-2">
+                    <div className="bg-gray-700 border-2 border-dashed border-gray-600 rounded-lg p-8 text-center">
+                      <BuildingOfficeIcon className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+                      <h4 className="text-lg font-medium text-white mb-2">No Hotels Added</h4>
+                      <p className="text-gray-400 mb-4">Add hotel details for the customer's stay</p>
+                      <button
+                        type="button"
+                        onClick={addHotelEntry}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                      >
+                        <PlusIcon className="h-4 w-4" />
+                        Add First Hotel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="col-span-2 space-y-4">
+                    {hotelEntries.map((entry, index) => (
+                      <div key={entry.id} className="bg-gray-700 border border-gray-600 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-md font-semibold text-white">Hotel {index + 1}</h4>
+                          {hotelEntries.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeHotelEntry(entry.id)}
+                              className="p-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-lg transition-colors"
+                              title="Remove Hotel"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">
+                              Hotel *
+                            </label>
+                            <select
+                              required
+                              value={entry.hotelName}
+                              onChange={(e) => updateHotelEntry(entry.id, 'hotelName', e.target.value)}
+                              className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="">Select Hotel</option>
+                              {hotels.map(hotel => (
+                                <option key={hotel._id} value={hotel._id}>
+                                  {hotel.hotelName}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">
+                              Destination *
+                            </label>
+                            <select
+                              required
+                              value={entry.destination}
+                              onChange={(e) => updateHotelEntry(entry.id, 'destination', e.target.value)}
+                              className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="">Select Destination</option>
+                              {destinations.map(dest => (
+                                <option key={dest._id} value={dest._id}>
+                                  {dest.destinationName}, {dest.country}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">
+                              Check-in Date *
+                            </label>
+                            <input
+                              type="date"
+                              required
+                              value={entry.checkinDate}
+                              onChange={(e) => updateHotelEntry(entry.id, 'checkinDate', e.target.value)}
+                              className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">
+                              Check-out Date *
+                            </label>
+                            <input
+                              type="date"
+                              required
+                              value={entry.checkoutDate}
+                              onChange={(e) => updateHotelEntry(entry.id, 'checkoutDate', e.target.value)}
+                              className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">
+                              No. of Rooms *
+                            </label>
+                            <input
+                              type="text"
+                              required
+                              value={entry.noOfRooms}
+                              onChange={(e) => updateHotelEntry(entry.id, 'noOfRooms', e.target.value)}
+                              className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Enter number of rooms"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">
+                              Room Category *
+                            </label>
+                            <select
+                              required
+                              value={entry.roomCategory}
+                              onChange={(e) => updateHotelEntry(entry.id, 'roomCategory', e.target.value)}
+                              className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              disabled={!entry.hotelName}
+                            >
+                              <option value="">Select Room Category</option>
+                              {getRoomCategoriesForHotel(entry.hotelName).map((category, catIndex) => (
+                                <option key={catIndex} value={category.category}>
+                                  {category.category}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1">
+                              No. of Extra Beds
+                            </label>
+                            <input
+                              type="text"
+                              value={entry.noOfExtraBed}
+                              onChange={(e) => updateHotelEntry(entry.id, 'noOfExtraBed', e.target.value)}
+                              className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              placeholder="Enter number of extra beds"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Destination *
-                  </label>
-                  <select
-                    required
-                    value={formData.destination}
-                    onChange={(e) => setFormData({...formData, destination: e.target.value})}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={selectedHotel}
-                  >
-                    <option value="">Select Destination</option>
-                    {destinations.map(dest => (
-                      <option key={dest._id} value={dest._id}>
-                        {dest.destinationName}, {dest.country}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedHotel && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      Destination auto-selected based on hotel
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Check-in Date *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.checkinDate}
-                    onChange={(e) => setFormData({...formData, checkinDate: e.target.value})}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Check-out Date *
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={formData.checkoutDate}
-                    onChange={(e) => setFormData({...formData, checkoutDate: e.target.value})}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    No. of Rooms *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.noOfRooms}
-                    onChange={(e) => setFormData({...formData, noOfRooms: e.target.value})}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Room Category *
-                  </label>
-                  <select
-                    required
-                    value={formData.roomCategory}
-                    onChange={(e) => setFormData({...formData, roomCategory: e.target.value})}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    disabled={!selectedHotel}
-                  >
-                    <option value="">Select Room Category</option>
-                    {roomCategories.map((category, index) => (
-                      <option key={index} value={category.category}>
-                        {category.category} - Rate: {category.rate}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
-                    No. of Extra Beds
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.noOfExtraBed}
-                    onChange={(e) => setFormData({...formData, noOfExtraBed: e.target.value})}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+                    
+                    {/* Add Hotel Button */}
+                    <div className="flex justify-center mt-4">
+                      <button
+                        type="button"
+                        onClick={addHotelEntry}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                      >
+                        <PlusIcon className="h-4 w-4" />
+                        Add Another Hotel
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Additional Services */}
                 <div className="col-span-2">
@@ -1361,8 +1467,10 @@ const PackageManagementPage = () => {
                         <p className="text-white font-medium">{selectedPackage.phoneNumberOfDriver}</p>
                       </div>
                       <div>
-                        <label className="text-sm text-gray-400">Vehicle Type</label>
-                        <p className="text-white font-medium">{selectedPackage.vehicleType}</p>
+                        <label className="text-sm text-gray-400">Vehicle</label>
+                        <p className="text-white font-medium">
+                          {selectedPackage.vehicle?.vehicleName} ({selectedPackage.vehicle?.vehicleType})
+                        </p>
                       </div>
                       <div>
                         <label className="text-sm text-gray-400">Vehicle Registration</label>
@@ -1376,38 +1484,82 @@ const PackageManagementPage = () => {
                       <BuildingOfficeIcon className="h-5 w-5 text-green-500" />
                       Hotel Information
                     </h3>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-sm text-gray-400">Hotel Name</label>
-                        <p className="text-white font-medium">{selectedPackage.hotelName?.hotelName}</p>
+                    
+                    {selectedPackage.hotelEntries && selectedPackage.hotelEntries.length > 0 ? (
+                      <div className="space-y-4">
+                        {selectedPackage.hotelEntries.map((entry, index) => (
+                          <div key={entry.id || index} className="bg-gray-600 p-3 rounded-lg border border-gray-500">
+                            <h4 className="text-md font-semibold text-white mb-3">Hotel {index + 1}</h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div>
+                                <label className="text-sm text-gray-400">Hotel Name</label>
+                                <p className="text-white font-medium">{entry.hotelName?.hotelName || entry.hotelName}</p>
+                              </div>
+                              <div>
+                                <label className="text-sm text-gray-400">Destination</label>
+                                <p className="text-white font-medium">{entry.destination?.destinationName || entry.destination}</p>
+                              </div>
+                              <div>
+                                <label className="text-sm text-gray-400">Check-in Date</label>
+                                <p className="text-white font-medium">{entry.checkinDate ? new Date(entry.checkinDate).toLocaleDateString() : 'N/A'}</p>
+                              </div>
+                              <div>
+                                <label className="text-sm text-gray-400">Check-out Date</label>
+                                <p className="text-white font-medium">{entry.checkoutDate ? new Date(entry.checkoutDate).toLocaleDateString() : 'N/A'}</p>
+                              </div>
+                              <div>
+                                <label className="text-sm text-gray-400">No. of Rooms</label>
+                                <p className="text-white font-medium">{entry.noOfRooms || 'N/A'}</p>
+                              </div>
+                              <div>
+                                <label className="text-sm text-gray-400">Room Category</label>
+                                <p className="text-white font-medium">{entry.roomCategory || 'N/A'}</p>
+                              </div>
+                              {entry.noOfExtraBed && (
+                                <div>
+                                  <label className="text-sm text-gray-400">No. of Extra Beds</label>
+                                  <p className="text-white font-medium">{entry.noOfExtraBed}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                      <div>
-                        <label className="text-sm text-gray-400">Destination</label>
-                        <p className="text-white font-medium">{selectedPackage.destination?.destinationName}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm text-gray-400">Check-in Date</label>
-                        <p className="text-white font-medium">{new Date(selectedPackage.checkinDate).toLocaleDateString()}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm text-gray-400">Check-out Date</label>
-                        <p className="text-white font-medium">{new Date(selectedPackage.checkoutDate).toLocaleDateString()}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm text-gray-400">No. of Rooms</label>
-                        <p className="text-white font-medium">{selectedPackage.noOfRooms}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm text-gray-400">Room Category</label>
-                        <p className="text-white font-medium">{selectedPackage.roomCategory}</p>
-                      </div>
-                      {selectedPackage.noOfExtraBed && (
+                    ) : (
+                      // Fallback for old packages with single hotel
+                      <div className="space-y-3">
                         <div>
-                          <label className="text-sm text-gray-400">No. of Extra Beds</label>
-                          <p className="text-white font-medium">{selectedPackage.noOfExtraBed}</p>
+                          <label className="text-sm text-gray-400">Hotel Name</label>
+                          <p className="text-white font-medium">{selectedPackage.hotelName?.hotelName || 'N/A'}</p>
                         </div>
-                      )}
-                    </div>
+                        <div>
+                          <label className="text-sm text-gray-400">Destination</label>
+                          <p className="text-white font-medium">{selectedPackage.destination?.destinationName || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm text-gray-400">Check-in Date</label>
+                          <p className="text-white font-medium">{selectedPackage.checkinDate ? new Date(selectedPackage.checkinDate).toLocaleDateString() : 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm text-gray-400">Check-out Date</label>
+                          <p className="text-white font-medium">{selectedPackage.checkoutDate ? new Date(selectedPackage.checkoutDate).toLocaleDateString() : 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm text-gray-400">No. of Rooms</label>
+                          <p className="text-white font-medium">{selectedPackage.noOfRooms || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm text-gray-400">Room Category</label>
+                          <p className="text-white font-medium">{selectedPackage.roomCategory || 'N/A'}</p>
+                        </div>
+                        {selectedPackage.noOfExtraBed && (
+                          <div>
+                            <label className="text-sm text-gray-400">No. of Extra Beds</label>
+                            <p className="text-white font-medium">{selectedPackage.noOfExtraBed}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1486,10 +1638,8 @@ const PackageManagementPage = () => {
                 </button>
                 <button 
                   onClick={() => {
-                    if (confirm('Are you sure you want to delete this package?')) {
-                      handleDeleteClick(selectedPackage)
-                      closePackageDetails()
-                    }
+                    handleDeleteClick(selectedPackage)
+                    closePackageDetails()
                   }}
                   className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 >

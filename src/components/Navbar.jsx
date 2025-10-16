@@ -9,7 +9,8 @@ import {
   BuildingOfficeIcon,
   CubeIcon,
   CurrencyDollarIcon,
-  DocumentTextIcon
+  DocumentTextIcon,
+  TruckIcon
 } from '@heroicons/react/24/outline'
 import logo from '../assets/logo-white.png'
 
@@ -52,6 +53,7 @@ function Navbar() {
     
     // Hotel Management section (Hotel Admin only)
     { to: '/hotel-management', label: 'Hotel Management', icon: BuildingOfficeIcon, roles: ['hotel_admin'] },
+    { to: '/vehicle-management', label: 'Vehicle Management', icon: TruckIcon, roles: ['hotel_admin'] },
     { to: '/expenditure-management', label: 'Expenditure Management', icon: CurrencyDollarIcon, roles: ['hotel_admin'] },
     { to: '/receipt-generation', label: 'Receipt Generation', icon: DocumentTextIcon, roles: ['hotel_admin'] },
     
@@ -81,23 +83,6 @@ function Navbar() {
             <h1 className="text-white text-xl font-bold">{pageTitle}</h1>
           </div>
           <div className="flex items-center gap-1">
-            {/* Navigation buttons */}
-            {filteredNavItems.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) => 
-                  `flex items-center gap-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap ${
-                    isActive 
-                      ? 'bg-[#5B8424]/20 text-white border border-[#5B8424]/30' 
-                      : 'text-white/70 hover:text-white hover:bg-white/5'
-                  }`
-                }
-              >
-                <Icon className="h-4 w-4" />
-                <span className="text-sm font-medium">{label}</span>
-              </NavLink>
-            ))}
             {/* Logout button */}
             <button 
               onClick={() => setLogoutDialog(true)} 

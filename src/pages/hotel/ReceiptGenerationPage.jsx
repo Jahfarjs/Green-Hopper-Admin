@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, Font, Image } from '@react-pdf/renderer';
-import { Download, FileText, Search, Package } from 'lucide-react';
-// Import logo as URL for better compatibility with react-pdf
+import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, PDFViewer, Font, Image } from '@react-pdf/renderer';
+import { Download, FileText, Search, Package, Eye, X } from 'lucide-react';
+// Import logo and seal as URL for better compatibility with react-pdf
 const logoWhite = new URL('../../assets/logo-white.png', import.meta.url).href;
+const sealImage = new URL('../../assets/seal.jpeg', import.meta.url).href;
 
 // Register fonts for Arabic text support
 Font.register({
@@ -21,14 +22,14 @@ const TourConfirmationVoucher = ({ packageData }) => {
     },
     header: {
       backgroundColor: '#ffffff',
-      padding: 10,
+      padding: 6,
       flexDirection: 'row',
       alignItems: 'center',
       borderBottom: '1px solid #e0e0e0',
     },
     logo: {
-      width: 50,
-      height: 50,
+      width: 40,
+      height: 40,
     },
     greetingContainer: {
       flex: 1,
@@ -37,25 +38,25 @@ const TourConfirmationVoucher = ({ packageData }) => {
     },
     greeting: {
       color: '#333333',
-      fontSize: 10,
+      fontSize: 8,
       textAlign: 'center',
       fontWeight: 'bold',
-      marginBottom: 2,
+      marginBottom: 1,
     },
     title: {
-      fontSize: 18,
+      fontSize: 14,
       color: '#333333',
       textAlign: 'center',
-      marginTop: 10,
-      marginBottom: 10,
+      marginTop: 6,
+      marginBottom: 6,
       fontFamily: 'Helvetica-Bold',
     },
     bookingInfo: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      marginBottom: 10,
-      paddingHorizontal: 15,
-      gap: 20,
+      marginBottom: 6,
+      paddingHorizontal: 10,
+      gap: 15,
     },
     bookingLeft: {
       flex: 1,
@@ -66,35 +67,35 @@ const TourConfirmationVoucher = ({ packageData }) => {
     infoLabel: {
       backgroundColor: '#ADD8E6',
       color: '#ffffff',
-      padding: 4,
-      fontSize: 8,
-      marginBottom: 3,
+      padding: 2,
+      fontSize: 7,
+      marginBottom: 2,
       fontWeight: 'bold',
-      borderRadius: 2,
+      borderRadius: 1,
     },
     infoValue: {
-      fontSize: 10,
-      marginBottom: 8,
+      fontSize: 8,
+      marginBottom: 4,
       fontWeight: 'bold',
       color: '#333333',
     },
     infoValueNormal: {
-      fontSize: 10,
-      marginBottom: 8,
+      fontSize: 8,
+      marginBottom: 4,
       color: '#333333',
     },
     packageDetailsSection: {
-      marginHorizontal: 10,
-      marginBottom: 10,
+      marginHorizontal: 8,
+      marginBottom: 6,
     },
     sectionTitle: {
       backgroundColor: '#556B2F',
       color: '#ffffff',
-      fontSize: 9,
+      fontSize: 8,
       fontWeight: 'bold',
       textAlign: 'center',
-      padding: 6,
-      marginBottom: 8,
+      padding: 4,
+      marginBottom: 4,
     },
     detailsGrid: {
       flexDirection: 'row',
@@ -105,41 +106,67 @@ const TourConfirmationVoucher = ({ packageData }) => {
       width: '48%',
       backgroundColor: '#f8f9fa',
       border: '1px solid #e0e0e0',
-      padding: 6,
-      marginBottom: 5,
-      minHeight: 35,
+      padding: 3,
+      marginBottom: 3,
+      minHeight: 25,
     },
     detailLabel: {
-      fontSize: 7,
+      fontSize: 6,
       color: '#666666',
       fontWeight: 'bold',
-      marginBottom: 2,
+      marginBottom: 1,
     },
     detailValue: {
-      fontSize: 8,
+      fontSize: 7,
       color: '#333333',
       fontWeight: 'bold',
     },
     notes: {
-      marginHorizontal: 10,
-      marginBottom: 10,
-      padding: 8,
+      marginHorizontal: 8,
+      marginBottom: 6,
+      padding: 4,
       backgroundColor: '#f8f9fa',
-      borderRadius: 3,
+      borderRadius: 2,
     },
     notesTitle: {
-      fontSize: 9,
+      fontSize: 7,
       fontWeight: 'bold',
-      marginBottom: 5,
+      marginBottom: 3,
       color: '#333333',
     },
     notesList: {
-      fontSize: 7,
-      lineHeight: 1.3,
+      fontSize: 6,
+      lineHeight: 1.2,
     },
     notesItem: {
+      marginBottom: 2,
+      paddingLeft: 1,
+    },
+    sealContainer: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      marginTop: 4,
+      marginRight: 10,
+      width: '100%',
+      height: 50,
+    },
+    seal: {
+      width: 50,
+      height: 50,
+      objectFit: 'contain',
+    },
+    hotelEntrySection: {
+      marginBottom: 4,
+    },
+    hotelEntryTitle: {
+      backgroundColor: '#4A5568',
+      color: '#ffffff',
+      fontSize: 7,
+      fontWeight: 'bold',
+      textAlign: 'center',
+      padding: 3,
       marginBottom: 3,
-      paddingLeft: 2,
+      borderRadius: 1,
     },
   });
 
@@ -200,73 +227,229 @@ const TourConfirmationVoucher = ({ packageData }) => {
         <View style={styles.packageDetailsSection}>
           <Text style={styles.sectionTitle}>PACKAGE DETAILS</Text>
           
-          <View style={styles.detailsGrid}>
-            <View style={styles.detailBox}>
-              <Text style={styles.detailLabel}>DESTINATION</Text>
-              <Text style={styles.detailValue}>{packageData.destination?.destinationName || 'N/A'}</Text>
+          {/* Multiple Hotels Support */}
+          {packageData.hotelEntries && packageData.hotelEntries.length > 0 ? (
+            packageData.hotelEntries.map((hotelEntry, index) => (
+              <View key={hotelEntry.id || index} style={styles.hotelEntrySection}>
+                {packageData.hotelEntries.length > 1 && (
+                  <Text style={styles.hotelEntryTitle}>HOTEL {index + 1}</Text>
+                )}
+                
+                {/* Compact grid layout for multiple hotels */}
+                <View style={packageData.hotelEntries.length > 1 ? {
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  justifyContent: 'space-between',
+                } : styles.detailsGrid}>
+                  <View style={packageData.hotelEntries.length > 1 ? {
+                    width: '32%',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #e0e0e0',
+                    padding: 2,
+                    marginBottom: 2,
+                    minHeight: 20,
+                  } : styles.detailBox}>
+                    <Text style={styles.detailLabel}>DESTINATION</Text>
+                    <Text style={styles.detailValue}>{hotelEntry.destination?.destinationName || 'N/A'}</Text>
+                  </View>
+                  
+                  <View style={packageData.hotelEntries.length > 1 ? {
+                    width: '32%',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #e0e0e0',
+                    padding: 2,
+                    marginBottom: 2,
+                    minHeight: 20,
+                  } : styles.detailBox}>
+                    <Text style={styles.detailLabel}>HOTEL</Text>
+                    <Text style={styles.detailValue}>{hotelEntry.hotelName?.hotelName || 'N/A'}</Text>
+                  </View>
+                  
+                  <View style={packageData.hotelEntries.length > 1 ? {
+                    width: '32%',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #e0e0e0',
+                    padding: 2,
+                    marginBottom: 2,
+                    minHeight: 20,
+                  } : styles.detailBox}>
+                    <Text style={styles.detailLabel}>CONF. NO.</Text>
+                    <Text style={styles.detailValue}>{packageData.packageCode}</Text>
+                  </View>
+                  
+                  <View style={packageData.hotelEntries.length > 1 ? {
+                    width: '32%',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #e0e0e0',
+                    padding: 2,
+                    marginBottom: 2,
+                    minHeight: 20,
+                  } : styles.detailBox}>
+                    <Text style={styles.detailLabel}>CHECK-IN</Text>
+                    <Text style={styles.detailValue}>{formatDate(hotelEntry.checkinDate)}</Text>
+                  </View>
+                  
+                  <View style={packageData.hotelEntries.length > 1 ? {
+                    width: '32%',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #e0e0e0',
+                    padding: 2,
+                    marginBottom: 2,
+                    minHeight: 20,
+                  } : styles.detailBox}>
+                    <Text style={styles.detailLabel}>CHECK-OUT</Text>
+                    <Text style={styles.detailValue}>{formatDate(hotelEntry.checkoutDate)}</Text>
+                  </View>
+                  
+                  <View style={packageData.hotelEntries.length > 1 ? {
+                    width: '32%',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #e0e0e0',
+                    padding: 2,
+                    marginBottom: 2,
+                    minHeight: 20,
+                  } : styles.detailBox}>
+                    <Text style={styles.detailLabel}>NO. OF PAX</Text>
+                    <Text style={styles.detailValue}>{packageData.noOfPax}</Text>
+                  </View>
+                  
+                  <View style={packageData.hotelEntries.length > 1 ? {
+                    width: '32%',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #e0e0e0',
+                    padding: 2,
+                    marginBottom: 2,
+                    minHeight: 20,
+                  } : styles.detailBox}>
+                    <Text style={styles.detailLabel}>NO. OF NIGHTS</Text>
+                    <Text style={styles.detailValue}>{calculateNights(hotelEntry.checkinDate, hotelEntry.checkoutDate)}</Text>
+                  </View>
+                  
+                  <View style={packageData.hotelEntries.length > 1 ? {
+                    width: '32%',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #e0e0e0',
+                    padding: 2,
+                    marginBottom: 2,
+                    minHeight: 20,
+                  } : styles.detailBox}>
+                    <Text style={styles.detailLabel}>NO. OF ROOMS</Text>
+                    <Text style={styles.detailValue}>{hotelEntry.noOfRooms}</Text>
+                  </View>
+                  
+                  <View style={packageData.hotelEntries.length > 1 ? {
+                    width: '32%',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #e0e0e0',
+                    padding: 2,
+                    marginBottom: 2,
+                    minHeight: 20,
+                  } : styles.detailBox}>
+                    <Text style={styles.detailLabel}>EXTRA BED</Text>
+                    <Text style={styles.detailValue}>{hotelEntry.noOfExtraBed || '0'}</Text>
+                  </View>
+                  
+                  <View style={packageData.hotelEntries.length > 1 ? {
+                    width: '32%',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #e0e0e0',
+                    padding: 2,
+                    marginBottom: 2,
+                    minHeight: 20,
+                  } : styles.detailBox}>
+                    <Text style={styles.detailLabel}>ROOM CATEGORY</Text>
+                    <Text style={styles.detailValue}>{hotelEntry.roomCategory}</Text>
+                  </View>
+                  
+                  <View style={packageData.hotelEntries.length > 1 ? {
+                    width: '32%',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #e0e0e0',
+                    padding: 2,
+                    marginBottom: 2,
+                    minHeight: 20,
+                  } : styles.detailBox}>
+                    <Text style={styles.detailLabel}>MEAL PLAN</Text>
+                    <Text style={styles.detailValue}>CPAI</Text>
+                  </View>
+                </View>
+              </View>
+            ))
+          ) : (
+            // Fallback for legacy single hotel data
+            <View style={styles.detailsGrid}>
+              <View style={styles.detailBox}>
+                <Text style={styles.detailLabel}>DESTINATION</Text>
+                <Text style={styles.detailValue}>{packageData.destination?.destinationName || 'N/A'}</Text>
+              </View>
+              
+              <View style={styles.detailBox}>
+                <Text style={styles.detailLabel}>HOTEL</Text>
+                <Text style={styles.detailValue}>{packageData.hotelName?.hotelName || 'N/A'}</Text>
+              </View>
+              
+              <View style={styles.detailBox}>
+                <Text style={styles.detailLabel}>CONF. NO.</Text>
+                <Text style={styles.detailValue}>{packageData.packageCode}</Text>
+              </View>
+              
+              <View style={styles.detailBox}>
+                <Text style={styles.detailLabel}>CHECK-IN</Text>
+                <Text style={styles.detailValue}>{formatDate(packageData.checkinDate)}</Text>
+              </View>
+              
+              <View style={styles.detailBox}>
+                <Text style={styles.detailLabel}>CHECK-OUT</Text>
+                <Text style={styles.detailValue}>{formatDate(packageData.checkoutDate)}</Text>
+              </View>
+              
+              <View style={styles.detailBox}>
+                <Text style={styles.detailLabel}>NO. OF PAX</Text>
+                <Text style={styles.detailValue}>{packageData.noOfPax}</Text>
+              </View>
+              
+              <View style={styles.detailBox}>
+                <Text style={styles.detailLabel}>NO. OF NIGHTS</Text>
+                <Text style={styles.detailValue}>{calculateNights(packageData.checkinDate, packageData.checkoutDate)}</Text>
+              </View>
+              
+              <View style={styles.detailBox}>
+                <Text style={styles.detailLabel}>NO. OF ROOMS</Text>
+                <Text style={styles.detailValue}>{packageData.noOfRooms}</Text>
+              </View>
+              
+              <View style={styles.detailBox}>
+                <Text style={styles.detailLabel}>EXTRA BED</Text>
+                <Text style={styles.detailValue}>{packageData.noOfExtraBed || '0'}</Text>
+              </View>
+              
+              <View style={styles.detailBox}>
+                <Text style={styles.detailLabel}>ROOM CATEGORY</Text>
+                <Text style={styles.detailValue}>{packageData.roomCategory}</Text>
+              </View>
+              
+              <View style={styles.detailBox}>
+                <Text style={styles.detailLabel}>MEAL PLAN</Text>
+                <Text style={styles.detailValue}>CPAI</Text>
+              </View>
             </View>
-            
-            <View style={styles.detailBox}>
-              <Text style={styles.detailLabel}>HOTEL</Text>
-              <Text style={styles.detailValue}>{packageData.hotelName?.hotelName || 'N/A'}</Text>
-            </View>
-            
-            <View style={styles.detailBox}>
-              <Text style={styles.detailLabel}>CONF. NO.</Text>
-              <Text style={styles.detailValue}>{packageData.packageCode}</Text>
-            </View>
-            
-            <View style={styles.detailBox}>
-              <Text style={styles.detailLabel}>CHECK-IN</Text>
-              <Text style={styles.detailValue}>{formatDate(packageData.checkinDate)}</Text>
-            </View>
-            
-            <View style={styles.detailBox}>
-              <Text style={styles.detailLabel}>CHECK-OUT</Text>
-              <Text style={styles.detailValue}>{formatDate(packageData.checkoutDate)}</Text>
-            </View>
-            
-            <View style={styles.detailBox}>
-              <Text style={styles.detailLabel}>NO. OF PAX</Text>
-              <Text style={styles.detailValue}>{packageData.noOfPax}</Text>
-            </View>
-            
-            <View style={styles.detailBox}>
-              <Text style={styles.detailLabel}>NO. OF NIGHTS</Text>
-              <Text style={styles.detailValue}>{calculateNights(packageData.checkinDate, packageData.checkoutDate)}</Text>
-            </View>
-            
-            <View style={styles.detailBox}>
-              <Text style={styles.detailLabel}>NO. OF ROOMS</Text>
-              <Text style={styles.detailValue}>{packageData.noOfRooms}</Text>
-            </View>
-            
-            <View style={styles.detailBox}>
-              <Text style={styles.detailLabel}>EXTRA BED</Text>
-              <Text style={styles.detailValue}>{packageData.noOfExtraBed || '0'}</Text>
-            </View>
-            
-            <View style={styles.detailBox}>
-              <Text style={styles.detailLabel}>ROOM CATEGORY</Text>
-              <Text style={styles.detailValue}>{packageData.roomCategory}</Text>
-            </View>
-            
-            <View style={styles.detailBox}>
-              <Text style={styles.detailLabel}>MEAL PLAN</Text>
-              <Text style={styles.detailValue}>CPAI</Text>
-            </View>
-          </View>
+          )}
         </View>
 
-        {/* Notes Section */}
+        {/* Notes Section - Compact */}
         <View style={styles.notes}>
           <Text style={styles.notesTitle}>Note:-</Text>
           <View style={styles.notesList}>
-            <Text style={styles.notesItem}>• Check In time is 1400 Hrs & Check out time is 1200 Hrs</Text>
-            <Text style={styles.notesItem}>• Please present this confirmation voucher along with ID proof at the Hotel / Resort reception at the time of check-in.</Text>
-            <Text style={styles.notesItem}>• For any additional services at the Hotel / Resort, please contact directly to the reception.</Text>
-            <Text style={styles.notesItem}>• For any clarification or amendment regarding your booking, please contact our help line No +91 75609 01999, +91 70259 01901</Text>
+            <Text style={styles.notesItem}>• Check In: 1400 Hrs, Check out: 1200 Hrs</Text>
+            <Text style={styles.notesItem}>• Present this voucher with ID proof at hotel reception</Text>
+            <Text style={styles.notesItem}>• Contact hotel reception for additional services</Text>
+            <Text style={styles.notesItem}>• Help line: +91 75609 01999, +91 70259 01901</Text>
           </View>
+        </View>
+
+        {/* Company Seal - Compact */}
+        <View style={styles.sealContainer}>
+          <Image style={styles.seal} src={sealImage} />
         </View>
 
       </Page>
@@ -279,6 +462,7 @@ const ReceiptGenerationPage = () => {
   const [selectedPackage, setSelectedPackage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     fetchPackages();
@@ -300,10 +484,8 @@ const ReceiptGenerationPage = () => {
         const data = await response.json();
         setPackages(data);
       } else {
-        console.error('Failed to fetch packages');
       }
     } catch (error) {
-      console.error('Error fetching packages:', error);
     } finally {
       setLoading(false);
     }
@@ -316,7 +498,7 @@ const ReceiptGenerationPage = () => {
   );
 
   return (
-    <div className="p-6">
+    <div className="p-6 pb-24">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-white mb-2">Receipt Generation</h1>
         <p className="text-gray-400">Generate tour confirmation vouchers for customers</p>
@@ -419,6 +601,14 @@ const ReceiptGenerationPage = () => {
           </div>
 
           <div className="flex gap-4">
+            <button
+              onClick={() => setShowPreview(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <Eye className="w-4 h-4" />
+              Preview PDF
+            </button>
+            
             <PDFDownloadLink
               document={<TourConfirmationVoucher packageData={selectedPackage} />}
               fileName={`tour-confirmation-${selectedPackage.packageCode}.pdf`}
@@ -452,6 +642,61 @@ const ReceiptGenerationPage = () => {
           <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-white mb-2">No Packages Found</h3>
           <p className="text-gray-400">No packages are available for receipt generation</p>
+        </div>
+      )}
+
+      {/* PDF Preview Modal */}
+      {showPreview && selectedPackage && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg w-full max-w-6xl h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                PDF Preview - {selectedPackage.packageCode}
+              </h3>
+              <button
+                onClick={() => setShowPreview(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            
+            {/* PDF Viewer */}
+            <div className="flex-1 overflow-hidden">
+              <PDFViewer
+                width="100%"
+                height="100%"
+                showToolbar={true}
+                className="border-0"
+              >
+                <TourConfirmationVoucher packageData={selectedPackage} />
+              </PDFViewer>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between p-4 border-t border-gray-200 bg-gray-50">
+              <div className="text-sm text-gray-600">
+                Preview of tour confirmation voucher for {selectedPackage.nameOfGuest}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                  Close Preview
+                </button>
+                <PDFDownloadLink
+                  document={<TourConfirmationVoucher packageData={selectedPackage} />}
+                  fileName={`tour-confirmation-${selectedPackage.packageCode}.pdf`}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Download PDF
+                </PDFDownloadLink>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

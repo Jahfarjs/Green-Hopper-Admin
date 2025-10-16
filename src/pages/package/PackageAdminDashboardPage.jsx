@@ -50,10 +50,8 @@ const PackageAdminDashboardPage = () => {
         const data = await response.json();
         setStatistics(data);
       } else {
-        console.error('Failed to fetch statistics');
       }
     } catch (error) {
-      console.error('Error fetching statistics:', error);
     } finally {
       setLoading(false);
     }
