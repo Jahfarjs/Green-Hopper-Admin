@@ -31,7 +31,7 @@ function VehicleManagementPage() {
     vehicleName: '',
     vehicleType: 'Innova',
     vehicleRatePerDay: '',
-    currency: 'USD'
+    currency: 'INR'
   })
   const [categories, setCategories] = useState(['Innova', 'Etiose', 'Traveller'])
   const [newCategory, setNewCategory] = useState('')
@@ -39,22 +39,8 @@ function VehicleManagementPage() {
 
   const vehicleTypes = categories.map(c => ({ value: c, label: c }))
 
-  const currencies = [
-    { value: 'USD', label: 'USD ($)', symbol: '$' },
-    { value: 'EUR', label: 'EUR (€)', symbol: '€' },
-    { value: 'GBP', label: 'GBP (£)', symbol: '£' },
-    { value: 'INR', label: 'INR (₹)', symbol: '₹' },
-    { value: 'MYR', label: 'MYR (RM)', symbol: 'RM' },
-    { value: 'LKR', label: 'LKR (Rs)', symbol: 'Rs' },
-    { value: 'AED', label: 'AED (د.إ)', symbol: 'د.إ' },
-    { value: 'SGD', label: 'SGD (S$)', symbol: 'S$' },
-    { value: 'JPY', label: 'JPY (¥)', symbol: '¥' },
-    { value: 'AUD', label: 'AUD (A$)', symbol: 'A$' }
-  ]
-
-  const getCurrencySymbol = (currencyCode) => {
-    const currency = currencies.find(c => c.value === currencyCode)
-    return currency ? currency.symbol : '$'
+  const getCurrencySymbol = () => {
+    return '₹'
   }
 
   useEffect(() => {
@@ -93,13 +79,19 @@ function VehicleManagementPage() {
       const url = editingVehicle ? `${API_BASE_URL}/vehicles/${editingVehicle._id}` : `${API_BASE_URL}/vehicles`
       const method = editingVehicle ? 'PUT' : 'POST'
       
+      // Always use INR as currency
+      const submitData = {
+        ...formData,
+        currency: 'INR'
+      }
+      
       const response = await fetch(url, {
         method,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(submitData)
       })
       
       if (response.ok) {
@@ -128,7 +120,7 @@ function VehicleManagementPage() {
       vehicleName: vehicle.vehicleName,
       vehicleType: vehicle.vehicleType,
       vehicleRatePerDay: vehicle.vehicleRatePerDay,
-      currency: vehicle.currency || 'USD'
+      currency: 'INR'
     })
     setShowModal(true)
   }
@@ -169,7 +161,7 @@ function VehicleManagementPage() {
       vehicleName: '',
       vehicleType: categories[0] || 'Innova',
       vehicleRatePerDay: '',
-      currency: 'USD'
+      currency: 'INR'
     })
     setEditingVehicle(null)
   }
@@ -335,8 +327,8 @@ function VehicleManagementPage() {
               <p className="text-sm font-medium text-gray-400">Avg Rate</p>
               <p className="text-2xl font-bold text-white">
                 {vehicles.length > 0 ? 
-                  `$${Math.round(vehicles.reduce((sum, v) => sum + parseFloat(v.vehicleRatePerDay || 0), 0) / vehicles.length)}` 
-                  : '$0'
+                  `${getCurrencySymbol()}${Math.round(vehicles.reduce((sum, v) => sum + parseFloat(v.vehicleRatePerDay || 0), 0) / vehicles.length)}` 
+                  : `${getCurrencySymbol()}0`
                 }
               </p>
             </div>
@@ -388,18 +380,14 @@ function VehicleManagementPage() {
                         </span>
                       </div>
                       
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
                         <div className="flex items-center gap-2 text-gray-300">
                           <TruckIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
                           <span className="truncate capitalize">{vehicle.vehicleType}</span>
                         </div>
                         <div className="flex items-center gap-2 text-gray-300">
                           <CurrencyDollarIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                          <span className="truncate">{getCurrencySymbol(vehicle.currency)}{vehicle.vehicleRatePerDay}/day</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-gray-300">
-                          <span className="text-gray-500 flex-shrink-0">Currency:</span>
-                          <span className="truncate">{vehicle.currency}</span>
+                          <span className="truncate">{getCurrencySymbol()}{vehicle.vehicleRatePerDay}/day</span>
                         </div>
                       </div>
                     </div>
@@ -585,7 +573,7 @@ function VehicleManagementPage() {
                     </div>
                   </div>
 
-                  <div>
+                  <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Vehicle Rate/Day *
                     </label>
@@ -596,24 +584,6 @@ function VehicleManagementPage() {
                       onChange={(e) => setFormData({...formData, vehicleRatePerDay: e.target.value})}
                       className="w-full px-3 py-2 bg-[#2a2a2a] border border-[#444] rounded-lg text-white focus:border-[#5B8424] focus:outline-none"
                     />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Currency *
-                    </label>
-                    <select
-                      required
-                      value={formData.currency}
-                      onChange={(e) => setFormData({...formData, currency: e.target.value})}
-                      className="w-full px-3 py-2 bg-[#2a2a2a] border border-[#444] rounded-lg text-white focus:border-[#5B8424] focus:outline-none"
-                    >
-                      {currencies.map(currency => (
-                        <option key={currency.value} value={currency.value}>
-                          {currency.label}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 </div>
 
@@ -712,11 +682,11 @@ function VehicleManagementPage() {
                   </div>
                   <div>
                     <label className="text-sm text-gray-400">Daily Rate</label>
-                    <p className="text-white font-medium">{getCurrencySymbol(selectedVehicle.currency)}{selectedVehicle.vehicleRatePerDay}/day</p>
+                    <p className="text-white font-medium">{getCurrencySymbol()}{selectedVehicle.vehicleRatePerDay}/day</p>
                   </div>
                   <div>
                     <label className="text-sm text-gray-400">Currency</label>
-                    <p className="text-white font-medium">{selectedVehicle.currency}</p>
+                    <p className="text-white font-medium">INR (₹)</p>
                   </div>
                 </div>
               </div>

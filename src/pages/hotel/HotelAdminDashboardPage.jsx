@@ -585,43 +585,6 @@ const HotelAdminDashboardPage = () => {
               </div>
             </div>
           </div>
-
-          {/* Recent Bookings */}
-          {statistics?.recentBookings && statistics.recentBookings.length > 0 && (
-            <div className="bg-gray-800 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Recent Bookings</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-700">
-                      <th className="text-left text-gray-300 py-2">Guest</th>
-                      <th className="text-left text-gray-300 py-2">Hotel</th>
-                      <th className="text-left text-gray-300 py-2">Destination</th>
-                      <th className="text-left text-gray-300 py-2">Price</th>
-                      <th className="text-left text-gray-300 py-2">Check-in</th>
-                      <th className="text-left text-gray-300 py-2">Check-out</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {statistics.recentBookings.map((booking, index) => (
-                      <tr key={index} className="border-b border-gray-700">
-                        <td className="text-white py-2">{booking.nameOfGuest}</td>
-                        <td className="text-gray-300 py-2">{booking.hotelName?.hotelName || 'N/A'}</td>
-                        <td className="text-gray-300 py-2">{booking.destination?.destinationName || 'N/A'}</td>
-                        <td className="text-gray-300 py-2">{booking.currency} {booking.packagePrice}</td>
-                        <td className="text-gray-300 py-2">
-                          {new Date(booking.checkinDate).toLocaleDateString()}
-                        </td>
-                        <td className="text-gray-300 py-2">
-                          {new Date(booking.checkoutDate).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
         </>
       )}
     </div>

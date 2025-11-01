@@ -33,27 +33,13 @@ function HotelManagementPage() {
   const [formData, setFormData] = useState({
     hotelName: '',
     destination: '',
-    currency: 'USD',
+    currency: 'INR',
     roomCategories: [{ category: '', rate: '', extraBedRate: '' }]
   })
   const itemsPerPage = 10
 
-  const currencies = [
-    { value: 'USD', label: 'USD ($)', symbol: '$' },
-    { value: 'EUR', label: 'EUR (€)', symbol: '€' },
-    { value: 'GBP', label: 'GBP (£)', symbol: '£' },
-    { value: 'INR', label: 'INR (₹)', symbol: '₹' },
-    { value: 'MYR', label: 'MYR (RM)', symbol: 'RM' },
-    { value: 'LKR', label: 'LKR (Rs)', symbol: 'Rs' },
-    { value: 'AED', label: 'AED (د.إ)', symbol: 'د.إ' },
-    { value: 'SGD', label: 'SGD (S$)', symbol: 'S$' },
-    { value: 'JPY', label: 'JPY (¥)', symbol: '¥' },
-    { value: 'AUD', label: 'AUD (A$)', symbol: 'A$' }
-  ]
-
-  const getCurrencySymbol = (currencyCode) => {
-    const currency = currencies.find(c => c.value === currencyCode)
-    return currency ? currency.symbol : '$'
+  const getCurrencySymbol = () => {
+    return '₹'
   }
 
   useEffect(() => {
@@ -97,13 +83,19 @@ function HotelManagementPage() {
       const url = editingHotel ? `${API_BASE_URL}/hotels/${editingHotel._id}` : `${API_BASE_URL}/hotels`
       const method = editingHotel ? 'PUT' : 'POST'
       
+      // Always use INR as currency
+      const submitData = {
+        ...formData,
+        currency: 'INR'
+      }
+      
       const response = await fetch(url, {
         method,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(submitData)
       })
       
       if (response.ok) {
@@ -131,7 +123,7 @@ function HotelManagementPage() {
     setFormData({
       hotelName: hotel.hotelName,
       destination: hotel.destination._id,
-      currency: hotel.currency || 'USD',
+      currency: 'INR',
       roomCategories: hotel.roomCategories || [{ category: '', rate: '', extraBedRate: '' }]
     })
     setShowModal(true)
@@ -172,7 +164,7 @@ function HotelManagementPage() {
     setFormData({
       hotelName: '',
       destination: '',
-      currency: 'USD',
+      currency: 'INR',
       roomCategories: [{ category: '', rate: '', extraBedRate: '' }]
     })
     setEditingHotel(null)
@@ -403,7 +395,7 @@ function HotelManagementPage() {
                         </div>
                         <div className="flex items-center gap-2 text-gray-300">
                           <CurrencyDollarIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                          <span className="truncate">From {getCurrencySymbol(hotel.currency)}{hotel.roomCategories?.[0]?.rate || 'N/A'}</span>
+                          <span className="truncate">From {getCurrencySymbol()}{hotel.roomCategories?.[0]?.rate || 'N/A'}</span>
                         </div>
                       </div>
                     </div>
@@ -571,24 +563,6 @@ function HotelManagementPage() {
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Currency *
-                    </label>
-                    <select
-                      required
-                      value={formData.currency}
-                      onChange={(e) => setFormData({...formData, currency: e.target.value})}
-                      className="w-full px-3 py-2 bg-[#2a2a2a] border border-[#444] rounded-lg text-white focus:border-[#5B8424] focus:outline-none"
-                    >
-                      {currencies.map(currency => (
-                        <option key={currency.value} value={currency.value}>
-                          {currency.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Room Categories *
@@ -748,7 +722,7 @@ function HotelManagementPage() {
                       </div>
                       <div>
                         <label className="text-sm text-gray-400">Currency</label>
-                        <p className="text-white font-medium">{selectedHotel.currency}</p>
+                        <p className="text-white font-medium">INR (₹)</p>
                       </div>
                     </div>
                   </div>
@@ -767,11 +741,11 @@ function HotelManagementPage() {
                           <div className="flex justify-between items-start">
                             <div>
                               <p className="text-white font-medium">{room.category}</p>
-                              <p className="text-sm text-gray-400">Rate: {getCurrencySymbol(selectedHotel.currency)}{room.rate}</p>
+                              <p className="text-sm text-gray-400">Rate: {getCurrencySymbol()}{room.rate}</p>
                             </div>
                             <div className="text-right">
                               <p className="text-sm text-gray-400">Extra Bed</p>
-                              <p className="text-white font-medium">{getCurrencySymbol(selectedHotel.currency)}{room.extraBedRate}</p>
+                              <p className="text-white font-medium">{getCurrencySymbol()}{room.extraBedRate}</p>
                             </div>
                           </div>
                         </div>
@@ -791,7 +765,7 @@ function HotelManagementPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400">Starting Rate:</span>
-                        <span className="text-white font-medium">{getCurrencySymbol(selectedHotel.currency)}{selectedHotel.roomCategories?.[0]?.rate || 'N/A'}</span>
+                        <span className="text-white font-medium">{getCurrencySymbol()}{selectedHotel.roomCategories?.[0]?.rate || 'N/A'}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400">Location:</span>

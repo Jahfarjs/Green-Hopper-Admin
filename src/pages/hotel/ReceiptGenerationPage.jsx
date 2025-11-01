@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Document, Page, Text, View, StyleSheet, PDFDownloadLink, PDFViewer, Font, Image } from '@react-pdf/renderer';
-import { Download, FileText, Search, Package, Eye, X } from 'lucide-react';
+import { Download, Search, Package, Eye, X } from 'lucide-react';
 // Import logo and seal as URL for better compatibility with react-pdf
 const logoWhite = new URL('../../assets/logo-white.png', import.meta.url).href;
 const sealImage = new URL('../../assets/seal.jpeg', import.meta.url).href;
@@ -534,108 +534,52 @@ const ReceiptGenerationPage = () => {
             {filteredPackages.map((pkg) => (
               <div
                 key={pkg._id}
-                className={`p-4 rounded-lg border cursor-pointer transition-colors ${
+                className={`p-4 rounded-lg border transition-colors ${
                   selectedPackage?._id === pkg._id
                     ? 'bg-blue-600 border-blue-500'
-                    : 'bg-gray-700 border-gray-600 hover:bg-gray-600'
+                    : 'bg-gray-700 border-gray-600 hover:bg-gray-600 cursor-pointer'
                 }`}
                 onClick={() => setSelectedPackage(pkg)}
               >
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="text-white font-semibold">{pkg.nameOfGuest}</h3>
-                    <p className="text-gray-300 text-sm">Package: {pkg.packageCode}</p>
-                    <p className="text-gray-400 text-sm">
-                      {pkg.nationality} • {pkg.noOfPax} Pax • {pkg.currency} {pkg.packagePrice}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-gray-400 text-sm">
-                      {new Date(pkg.checkinDate).toLocaleDateString()} - {new Date(pkg.checkoutDate).toLocaleDateString()}
-                    </p>
-                    <p className="text-gray-400 text-sm">{pkg.hotelName?.hotelName || 'N/A'}</p>
-                  </div>
+                <div>
+                  <h3 className="text-white font-semibold">{pkg.nameOfGuest}</h3>
+                  <p className="text-gray-300 text-sm">Package: {pkg.packageCode}</p>
                 </div>
+                
+                {/* Buttons appear only when this package is selected */}
+                {selectedPackage?._id === pkg._id && (
+                  <div className="mt-4 flex gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => setShowPreview(true)}
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+                    >
+                      <Eye className="w-4 h-4" />
+                      Preview PDF
+                    </button>
+                    
+                    <PDFDownloadLink
+                      document={<TourConfirmationVoucher packageData={selectedPackage} />}
+                      fileName={`tour-confirmation-${selectedPackage.packageCode}.pdf`}
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-blue-700 text-white rounded-lg hover:bg-blue-800 transition-colors text-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download PDF
+                    </PDFDownloadLink>
+                    
+                    <button
+                      onClick={() => setSelectedPackage(null)}
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors text-sm"
+                    >
+                      <Package className="w-4 h-4" />
+                      Deselect
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
-
-      {/* PDF Generation */}
-      {selectedPackage && (
-        <div className="bg-gray-800 rounded-lg p-6">
-          <div className="flex items-center gap-4 mb-4">
-            <FileText className="w-6 h-6 text-blue-500" />
-            <h2 className="text-xl font-semibold text-white">Generate Receipt</h2>
-          </div>
-
-          <div className="bg-gray-700 rounded-lg p-4 mb-4">
-            <h3 className="text-white font-semibold mb-2">Selected Package Details:</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-gray-400">Guest:</span>
-                <span className="text-white ml-2">{selectedPackage.nameOfGuest}</span>
-              </div>
-              <div>
-                <span className="text-gray-400">Package Code:</span>
-                <span className="text-white ml-2">{selectedPackage.packageCode}</span>
-              </div>
-              <div>
-                <span className="text-gray-400">Nationality:</span>
-                <span className="text-white ml-2">{selectedPackage.nationality}</span>
-              </div>
-              <div>
-                <span className="text-gray-400">No. of Pax:</span>
-                <span className="text-white ml-2">{selectedPackage.noOfPax}</span>
-              </div>
-              <div>
-                <span className="text-gray-400">Hotel:</span>
-                <span className="text-white ml-2">{selectedPackage.hotelName?.hotelName || 'N/A'}</span>
-              </div>
-              <div>
-                <span className="text-gray-400">Room Category:</span>
-                <span className="text-white ml-2">{selectedPackage.roomCategory}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-4">
-            <button
-              onClick={() => setShowPreview(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              <Eye className="w-4 h-4" />
-              Preview PDF
-            </button>
-            
-            <PDFDownloadLink
-              document={<TourConfirmationVoucher packageData={selectedPackage} />}
-              fileName={`tour-confirmation-${selectedPackage.packageCode}.pdf`}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Download PDF
-            </PDFDownloadLink>
-            
-            <button
-              onClick={() => setSelectedPackage(null)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              <Package className="w-4 h-4" />
-              Select Different Package
-            </button>
-          </div>
-        </div>
-      )}
-
-      {!selectedPackage && packages.length > 0 && (
-        <div className="bg-gray-800 rounded-lg p-6 text-center">
-          <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-white mb-2">Select a Package</h3>
-          <p className="text-gray-400">Choose a package from the list above to generate a receipt</p>
-        </div>
-      )}
 
       {packages.length === 0 && !loading && (
         <div className="bg-gray-800 rounded-lg p-6 text-center">

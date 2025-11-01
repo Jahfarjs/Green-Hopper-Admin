@@ -38,24 +38,6 @@ const PackageManagementPage = () => {
   const [hotelEntries, setHotelEntries] = useState([]);
   const itemsPerPage = 10;
 
-  const currencies = [
-    { value: 'USD', label: 'USD ($)', symbol: '$' },
-    { value: 'EUR', label: 'EUR (€)', symbol: '€' },
-    { value: 'GBP', label: 'GBP (£)', symbol: '£' },
-    { value: 'INR', label: 'INR (₹)', symbol: '₹' },
-    { value: 'MYR', label: 'MYR (RM)', symbol: 'RM' },
-    { value: 'LKR', label: 'LKR (Rs)', symbol: 'Rs' },
-    { value: 'AED', label: 'AED (د.إ)', symbol: 'د.إ' },
-    { value: 'SGD', label: 'SGD (S$)', symbol: 'S$' },
-    { value: 'JPY', label: 'JPY (¥)', symbol: '¥' },
-    { value: 'AUD', label: 'AUD (A$)', symbol: 'A$' }
-  ];
-
-  const getCurrencySymbol = (currencyCode) => {
-    const currency = currencies.find(c => c.value === currencyCode);
-    return currency ? currency.symbol : '$';
-  };
-
   // Form state
   const [formData, setFormData] = useState({
     nameOfGuest: '',
@@ -72,7 +54,6 @@ const PackageManagementPage = () => {
     timeOfDeparture: '',
     departureFlight: '',
     packagePrice: '',
-    currency: 'USD',
     packageCode: '',
     nameOfDriver: '',
     phoneNumberOfDriver: '',
@@ -185,6 +166,30 @@ const PackageManagementPage = () => {
     }
   };
 
+  // Validation helper functions
+  const validateName = (value) => {
+    // Only allow letters, spaces, apostrophes, and hyphens
+    return value.replace(/[^a-zA-Z\s'-]/g, '');
+  };
+
+  const validatePhone = (value) => {
+    // Only allow digits, and + at the start for international numbers
+    if (value.startsWith('+')) {
+      return '+' + value.slice(1).replace(/[^\d]/g, '');
+    }
+    return value.replace(/[^\d]/g, '');
+  };
+
+  const validateNumber = (value) => {
+    // Only allow digits and decimal point
+    return value.replace(/[^\d.]/g, '').replace(/\.(?=.*\.)/g, ''); // Allow only one decimal point
+  };
+
+  const validateInteger = (value) => {
+    // Only allow digits (no decimals)
+    return value.replace(/[^\d]/g, '');
+  };
+
   // Hotel entries management functions
   const addHotelEntry = () => {
     const newEntry = {
@@ -207,7 +212,14 @@ const PackageManagementPage = () => {
   const updateHotelEntry = (entryId, field, value) => {
     setHotelEntries(hotelEntries.map(entry => {
       if (entry.id === entryId) {
-        const updatedEntry = { ...entry, [field]: value };
+        let validatedValue = value;
+        
+        // Apply validation based on field type
+        if (field === 'noOfRooms' || field === 'noOfExtraBed') {
+          validatedValue = validateInteger(value);
+        }
+        
+        const updatedEntry = { ...entry, [field]: validatedValue };
         
         // Auto-populate destination when hotel is selected
         if (field === 'hotelName') {
@@ -288,7 +300,6 @@ const PackageManagementPage = () => {
       timeOfDeparture: pkg.timeOfDeparture || '',
       departureFlight: pkg.departureFlight || '',
       packagePrice: pkg.packagePrice || '',
-      currency: pkg.currency || 'USD',
       packageCode: pkg.packageCode || '',
       nameOfDriver: pkg.nameOfDriver || '',
       phoneNumberOfDriver: pkg.phoneNumberOfDriver || '',
@@ -381,11 +392,10 @@ const PackageManagementPage = () => {
       arrivalFlight: '',
       dateOfDeparture: '',
       cityOfDeparture: '',
-      timeOfDeparture: '',
-      departureFlight: '',
-      packagePrice: '',
-      currency: 'USD',
-      packageCode: '',
+    timeOfDeparture: '',
+    departureFlight: '',
+    packagePrice: '',
+    packageCode: '',
       nameOfDriver: '',
       phoneNumberOfDriver: '',
       vehicle: '',
@@ -536,11 +546,16 @@ const PackageManagementPage = () => {
                         </div>
                         <div className="flex items-center gap-2 text-gray-300">
                           <MapPinIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                          <span className="truncate">{pkg.destination?.destinationName}</span>
+                          <span className="truncate">
+                            {pkg.hotelEntries && pkg.hotelEntries.length > 0
+                              ? pkg.hotelEntries[0]?.destination?.destinationName || 'N/A'
+                              : pkg.destination?.destinationName || 'N/A'
+                            }
+                          </span>
                         </div>
                         <div className="flex items-center gap-2 text-gray-300">
                           <CurrencyDollarIcon className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                          <span className="truncate">{getCurrencySymbol(pkg.currency)}{pkg.packagePrice}</span>
+                          <span className="truncate">₹{pkg.packagePrice}</span>
                         </div>
                       </div>
                     </div>
@@ -701,7 +716,7 @@ const PackageManagementPage = () => {
                     type="text"
                     required
                     value={formData.nameOfGuest}
-                    onChange={(e) => setFormData({...formData, nameOfGuest: e.target.value})}
+                    onChange={(e) => setFormData({...formData, nameOfGuest: validateName(e.target.value)})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter guest name"
                   />
@@ -715,7 +730,7 @@ const PackageManagementPage = () => {
                     type="text"
                     required
                     value={formData.phoneNumber}
-                    onChange={(e) => setFormData({...formData, phoneNumber: e.target.value})}
+                    onChange={(e) => setFormData({...formData, phoneNumber: validatePhone(e.target.value)})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter phone number"
                   />
@@ -748,7 +763,7 @@ const PackageManagementPage = () => {
                     type="text"
                     required
                     value={formData.noOfPax}
-                    onChange={(e) => setFormData({...formData, noOfPax: e.target.value})}
+                    onChange={(e) => setFormData({...formData, noOfPax: validateInteger(e.target.value)})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter number of pax"
                   />
@@ -761,7 +776,7 @@ const PackageManagementPage = () => {
                   <input
                     type="text"
                     value={formData.noOfChildren}
-                    onChange={(e) => setFormData({...formData, noOfChildren: e.target.value})}
+                    onChange={(e) => setFormData({...formData, noOfChildren: validateInteger(e.target.value)})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter number of children"
                   />
@@ -887,31 +902,13 @@ const PackageManagementPage = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-1">
-                    Currency *
-                  </label>
-                  <select
-                    required
-                    value={formData.currency}
-                    onChange={(e) => setFormData({...formData, currency: e.target.value})}
-                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {currencies.map(currency => (
-                      <option key={currency.value} value={currency.value}>
-                        {currency.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
                     Package Price *
                   </label>
                   <input
                     type="text"
                     required
                     value={formData.packagePrice}
-                    onChange={(e) => setFormData({...formData, packagePrice: e.target.value})}
+                    onChange={(e) => setFormData({...formData, packagePrice: validateNumber(e.target.value)})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter package price"
                   />
@@ -945,7 +942,7 @@ const PackageManagementPage = () => {
                     type="text"
                     required
                     value={formData.nameOfDriver}
-                    onChange={(e) => setFormData({...formData, nameOfDriver: e.target.value})}
+                    onChange={(e) => setFormData({...formData, nameOfDriver: validateName(e.target.value)})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -958,7 +955,7 @@ const PackageManagementPage = () => {
                     type="text"
                     required
                     value={formData.phoneNumberOfDriver}
-                    onChange={(e) => setFormData({...formData, phoneNumberOfDriver: e.target.value})}
+                    onChange={(e) => setFormData({...formData, phoneNumberOfDriver: validatePhone(e.target.value)})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1175,7 +1172,7 @@ const PackageManagementPage = () => {
                   <input
                     type="text"
                     value={formData.cialParkingRate}
-                    onChange={(e) => setFormData({...formData, cialParkingRate: e.target.value})}
+                    onChange={(e) => setFormData({...formData, cialParkingRate: validateNumber(e.target.value)})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1187,7 +1184,7 @@ const PackageManagementPage = () => {
                   <input
                     type="text"
                     value={formData.cialEntryRate}
-                    onChange={(e) => setFormData({...formData, cialEntryRate: e.target.value})}
+                    onChange={(e) => setFormData({...formData, cialEntryRate: validateNumber(e.target.value)})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1199,7 +1196,7 @@ const PackageManagementPage = () => {
                   <input
                     type="text"
                     value={formData.bouquetRate}
-                    onChange={(e) => setFormData({...formData, bouquetRate: e.target.value})}
+                    onChange={(e) => setFormData({...formData, bouquetRate: validateNumber(e.target.value)})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1211,7 +1208,7 @@ const PackageManagementPage = () => {
                   <input
                     type="text"
                     value={formData.simCardRate}
-                    onChange={(e) => setFormData({...formData, simCardRate: e.target.value})}
+                    onChange={(e) => setFormData({...formData, simCardRate: validateNumber(e.target.value)})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1223,7 +1220,7 @@ const PackageManagementPage = () => {
                   <input
                     type="text"
                     value={formData.foodRate}
-                    onChange={(e) => setFormData({...formData, foodRate: e.target.value})}
+                    onChange={(e) => setFormData({...formData, foodRate: validateNumber(e.target.value)})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1241,7 +1238,7 @@ const PackageManagementPage = () => {
                     type="text"
                     required
                     value={formData.nameOfTourExecutive}
-                    onChange={(e) => setFormData({...formData, nameOfTourExecutive: e.target.value})}
+                    onChange={(e) => setFormData({...formData, nameOfTourExecutive: validateName(e.target.value)})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1254,7 +1251,7 @@ const PackageManagementPage = () => {
                     type="text"
                     required
                     value={formData.nameOfReservationOfficer}
-                    onChange={(e) => setFormData({...formData, nameOfReservationOfficer: e.target.value})}
+                    onChange={(e) => setFormData({...formData, nameOfReservationOfficer: validateName(e.target.value)})}
                     className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -1443,11 +1440,7 @@ const PackageManagementPage = () => {
                       </div>
                       <div>
                         <label className="text-sm text-gray-400">Package Price</label>
-                        <p className="text-white font-medium">{getCurrencySymbol(selectedPackage.currency)}{selectedPackage.packagePrice}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm text-gray-400">Currency</label>
-                        <p className="text-white font-medium">{selectedPackage.currency}</p>
+                        <p className="text-white font-medium">₹{selectedPackage.packagePrice}</p>
                       </div>
                     </div>
                   </div>

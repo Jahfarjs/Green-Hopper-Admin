@@ -19,6 +19,7 @@ import {
 const ExpenditureManagementPage = () => {
   const [expenditures, setExpenditures] = useState([]);
   const [packages, setPackages] = useState([]);
+  const [hotels, setHotels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingExpenditure, setEditingExpenditure] = useState(null);
@@ -34,10 +35,6 @@ const ExpenditureManagementPage = () => {
     vehicleCost: 0,
     additionalServices: 0,
     totalExpenditure: 0,
-    originalCurrency: 'USD',
-    vehicleCurrency: 'USD',
-    convertedCurrency: 'INR',
-    exchangeRate: 83,
     services: {
       cialParking: 0,
       cialEntry: 0,
@@ -46,8 +43,6 @@ const ExpenditureManagementPage = () => {
       food: 0
     }
   });
-  const [manualExchangeRate, setManualExchangeRate] = useState(83);
-  const [useManualRate, setUseManualRate] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(5);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -60,27 +55,14 @@ const ExpenditureManagementPage = () => {
 
   const API_BASE_URL = import.meta.env.VITE_ADMIN_API_URL;
 
-  const currencies = [
-    { value: 'USD', label: 'USD ($)', symbol: '$' },
-    { value: 'EUR', label: 'EUR (€)', symbol: '€' },
-    { value: 'GBP', label: 'GBP (£)', symbol: '£' },
-    { value: 'INR', label: 'INR (₹)', symbol: '₹' },
-    { value: 'MYR', label: 'MYR (RM)', symbol: 'RM' },
-    { value: 'LKR', label: 'LKR (Rs)', symbol: 'Rs' },
-    { value: 'AED', label: 'AED (د.إ)', symbol: 'د.إ' },
-    { value: 'SGD', label: 'SGD (S$)', symbol: 'S$' },
-    { value: 'JPY', label: 'JPY (¥)', symbol: '¥' },
-    { value: 'AUD', label: 'AUD (A$)', symbol: 'A$' }
-  ];
-
-  const getCurrencySymbol = (currencyCode) => {
-    const currency = currencies.find(c => c.value === currencyCode);
-    return currency ? currency.symbol : '$';
+  const getCurrencySymbol = () => {
+    return '₹';
   };
 
   useEffect(() => {
     fetchExpenditures();
     fetchPackages();
+    fetchHotels();
   }, []);
 
   const fetchExpenditures = async () => {
@@ -107,6 +89,20 @@ const ExpenditureManagementPage = () => {
         setPackages(data);
       }
     } catch (error) {
+    }
+  };
+
+  const fetchHotels = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/hotels/public`);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Fetched hotels:', data);
+        setHotels(data);
+      }
+    } catch (error) {
+      console.log('Error fetching hotels:', error);
     }
   };
 
@@ -201,78 +197,115 @@ const ExpenditureManagementPage = () => {
   };
 
   const calculateNights = (checkinDate, checkoutDate) => {
-    if (!checkinDate || !checkoutDate) return 0;
-    const checkin = new Date(checkinDate);
-    const checkout = new Date(checkoutDate);
-    const diffTime = Math.abs(checkout - checkin);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  // Calculate exchange rate based on package price
-  // This function determines the exchange rate based on the package's currency and price
-  const calculateExchangeRate = (packagePrice, packageCurrency, hotelCurrency) => {
-    if (packageCurrency === hotelCurrency) {
-      return 1; // No conversion needed
+    if (!checkinDate || !checkoutDate) {
+      return 0;
     }
     
-    // Calculate exchange rate based on package price
-    // This is a simplified approach - you can integrate with a real-time currency API
-    const packagePriceNum = parseFloat(packagePrice) || 0;
+    // Handle different date formats
+    let checkin, checkout;
     
-    // For USD to INR conversion (most common case)
-    if (packageCurrency === 'INR' && hotelCurrency === 'USD') {
-      // If package price is high (luxury package), use higher exchange rate
-      if (packagePriceNum > 100000) {
-        return 85; // Higher rate for luxury packages
-      } else if (packagePriceNum > 50000) {
-        return 83; // Standard rate for mid-range packages
+    try {
+      // Try parsing as Date object first
+      if (checkinDate instanceof Date) {
+        checkin = checkinDate;
       } else {
-        return 80; // Lower rate for budget packages
+        // Handle various date string formats
+        const dateStr = checkinDate.toString();
+        if (dateStr.includes('T')) {
+          // ISO format
+          checkin = new Date(dateStr);
+        } else if (dateStr.includes('/')) {
+          // MM/DD/YYYY or DD/MM/YYYY format
+          const parts = dateStr.split('/');
+          if (parts.length === 3) {
+            // Try MM/DD/YYYY first
+            checkin = new Date(parts[2], parts[0] - 1, parts[1]);
+            if (isNaN(checkin.getTime())) {
+              // Try DD/MM/YYYY
+              checkin = new Date(parts[2], parts[1] - 1, parts[0]);
+            }
+          }
+        } else if (dateStr.includes('-')) {
+          // YYYY-MM-DD format
+          checkin = new Date(dateStr);
+        } else {
+          // Try direct parsing
+          checkin = new Date(dateStr);
+        }
       }
-    } else if (packageCurrency === 'USD' && hotelCurrency === 'INR') {
-      // For INR to USD conversion (reverse rate)
-      if (packagePriceNum > 1000) {
-        return 1/85; // Higher rate for luxury packages
-      } else if (packagePriceNum > 500) {
-        return 1/83; // Standard rate for mid-range packages
+      
+      if (checkoutDate instanceof Date) {
+        checkout = checkoutDate;
       } else {
-        return 1/80; // Lower rate for budget packages
+        // Handle various date string formats
+        const dateStr = checkoutDate.toString();
+        if (dateStr.includes('T')) {
+          // ISO format
+          checkout = new Date(dateStr);
+        } else if (dateStr.includes('/')) {
+          // MM/DD/YYYY or DD/MM/YYYY format
+          const parts = dateStr.split('/');
+          if (parts.length === 3) {
+            // Try MM/DD/YYYY first
+            checkout = new Date(parts[2], parts[0] - 1, parts[1]);
+            if (isNaN(checkout.getTime())) {
+              // Try DD/MM/YYYY
+              checkout = new Date(parts[2], parts[1] - 1, parts[0]);
+            }
+          }
+        } else if (dateStr.includes('-')) {
+          // YYYY-MM-DD format
+          checkout = new Date(dateStr);
+        } else {
+          // Try direct parsing
+          checkout = new Date(dateStr);
+        }
       }
+      
+      // Check if dates are valid
+      if (isNaN(checkin.getTime()) || isNaN(checkout.getTime())) {
+        return 0;
+      }
+      
+      // Calculate difference in days
+      const diffTime = checkout.getTime() - checkin.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      // Ensure we don't return negative values
+      const nights = Math.max(0, diffDays);
+      return nights;
+    } catch (error) {
+      return 0;
     }
-    
-    // Default exchange rates for other currency pairs
-    const exchangeRates = {
-      'USD_INR': 83,
-      'EUR_INR': 90,
-      'GBP_INR': 105,
-      'MYR_INR': 18,
-      'LKR_INR': 0.25,
-      'INR_USD': 1/83,
-      'INR_EUR': 1/90,
-      'INR_GBP': 1/105,
-      'INR_MYR': 1/18,
-      'INR_LKR': 1/0.25
-    };
-    
-    const rateKey = `${hotelCurrency}_${packageCurrency}`;
-    return exchangeRates[rateKey] || 1;
   };
 
-  const calculateExpenditure = (selectedPackage, customExchangeRate = null) => {
+  const calculateExpenditure = (selectedPackage) => {
     if (!selectedPackage) return { totalExpenditure: 0, breakdown: {} };
 
+    // Debug logging for package data
+
     // Handle multiple hotels or single hotel
-    const hotelEntries = selectedPackage.hotelEntries && selectedPackage.hotelEntries.length > 0 
-      ? selectedPackage.hotelEntries 
-      : [{
-          hotelName: selectedPackage.hotelName,
-          checkinDate: selectedPackage.checkinDate,
-          checkoutDate: selectedPackage.checkoutDate,
-          noOfRooms: selectedPackage.noOfRooms,
-          roomCategory: selectedPackage.roomCategory,
-          noOfExtraBed: selectedPackage.noOfExtraBed
-        }];
+    let hotelEntries = [];
+    
+    if (selectedPackage.hotelEntries && selectedPackage.hotelEntries.length > 0) {
+      // Use hotel entries from the package
+      hotelEntries = selectedPackage.hotelEntries;
+    } else if (selectedPackage.hotelName && selectedPackage.checkinDate && selectedPackage.checkoutDate) {
+      // Create single hotel entry from package data
+      hotelEntries = [{
+        hotelName: selectedPackage.hotelName,
+        checkinDate: selectedPackage.checkinDate,
+        checkoutDate: selectedPackage.checkoutDate,
+        noOfRooms: selectedPackage.noOfRooms || 1,
+        roomCategory: selectedPackage.roomCategory || 'Standard',
+        noOfExtraBed: selectedPackage.noOfExtraBed || 0,
+        destination: selectedPackage.destination
+      }];
+    } else {
+      // No valid hotel data found
+      hotelEntries = [];
+    }
+
 
     let totalRoomCost = 0;
     let totalExtraBedCost = 0;
@@ -281,36 +314,73 @@ const ExpenditureManagementPage = () => {
 
     // Calculate costs for each hotel entry
     hotelEntries.forEach((hotelEntry, index) => {
+      console.log(`Processing hotel entry ${index + 1}:`, hotelEntry);
+      
       // Calculate nights for this hotel entry
       const nights = calculateNights(hotelEntry.checkinDate, hotelEntry.checkoutDate);
       totalNights += nights;
       
       // Get room category rate from selected hotel
-      const selectedHotel = hotelEntry.hotelName;
+      let selectedHotel = null;
       let roomRate = 0;
-      let hotelCurrency = 'USD'; // Default hotel currency
       
-      // Debug logging to understand the data structure
+      // Try to find hotel by ID first, then by name
+      if (typeof hotelEntry.hotelName === 'string') {
+        // If hotelName is a string, it might be an ID or name
+        selectedHotel = hotels.find(hotel => 
+          hotel._id === hotelEntry.hotelName || 
+          hotel.hotelName === hotelEntry.hotelName ||
+          hotel._id.toString() === hotelEntry.hotelName ||
+          (hotel._id && hotel._id.toString() === hotelEntry.hotelName.toString())
+        );
+      } else if (typeof hotelEntry.hotelName === 'object' && hotelEntry.hotelName !== null) {
+        // If hotelName is an object (populated), use it directly
+        selectedHotel = hotelEntry.hotelName;
+        // Also try to find in hotels array in case it has more complete data
+        if (selectedHotel && selectedHotel._id) {
+          const foundInArray = hotels.find(hotel => 
+            hotel._id && selectedHotel._id && hotel._id.toString() === selectedHotel._id.toString()
+          );
+          if (foundInArray && foundInArray.roomCategories && foundInArray.roomCategories.length > 0) {
+            selectedHotel = foundInArray;
+          }
+        }
+      }
       
-      if (selectedHotel && selectedHotel.roomCategories) {
-        const roomCategory = selectedHotel.roomCategories.find(
+      
+      // Check if hotel data is properly populated
+      if (selectedHotel && selectedHotel.roomCategories && selectedHotel.roomCategories.length > 0) {
+        // Try exact match first
+        let roomCategory = selectedHotel.roomCategories.find(
           cat => cat.category === hotelEntry.roomCategory
         );
+        
+        // If no exact match, try case-insensitive match
+        if (!roomCategory && hotelEntry.roomCategory) {
+          roomCategory = selectedHotel.roomCategories.find(
+            cat => cat.category && cat.category.toLowerCase().trim() === hotelEntry.roomCategory.toLowerCase().trim()
+          );
+        }
+        
         if (roomCategory) {
           roomRate = parseFloat(roomCategory.rate) || 0;
-        } else {
         }
-        // Get hotel currency
-        hotelCurrency = selectedHotel.currency || 'USD';
       } else {
         // If no hotel data, try to get rates from package level
         if (selectedPackage.hotelName && selectedPackage.hotelName.roomCategories) {
-          const roomCategory = selectedPackage.hotelName.roomCategories.find(
+          let roomCategory = selectedPackage.hotelName.roomCategories.find(
             cat => cat.category === hotelEntry.roomCategory
           );
+          
+          // Try case-insensitive match
+          if (!roomCategory && hotelEntry.roomCategory) {
+            roomCategory = selectedPackage.hotelName.roomCategories.find(
+              cat => cat.category && cat.category.toLowerCase().trim() === hotelEntry.roomCategory.toLowerCase().trim()
+            );
+          }
+          
           if (roomCategory) {
             roomRate = parseFloat(roomCategory.rate) || 0;
-            hotelCurrency = selectedPackage.hotelName.currency || 'USD';
           }
         }
         
@@ -318,39 +388,17 @@ const ExpenditureManagementPage = () => {
         if (roomRate === 0) {
           const defaultRates = {
             'C1': 100, 'C2': 150, 'C3': 200, 'C4': 250, 'C5': 300,
-            'Standard': 100, 'Deluxe': 150, 'Premium': 200, 'Suite': 300
+            'Standard': 100, 'Deluxe': 150, 'Premium': 200, 'Suite': 300,
+            'Economy': 80, 'Business': 120, 'Executive': 180, 'Luxury': 400,
+            'Presidential': 500, 'Villa': 600, 'Penthouse': 800
           };
-          roomRate = defaultRates[hotelEntry.roomCategory] || 100; // Default to 100 if category not found
+          roomRate = defaultRates[hotelEntry.roomCategory] || defaultRates[hotelEntry.roomCategory?.toLowerCase()] || 0;
         }
       }
 
-      // Calculate exchange rate if needed
-      const packageCurrency = selectedPackage.currency || 'INR';
-      const exchangeRate = customExchangeRate || (useManualRate ? manualExchangeRate : calculateExchangeRate(
-        selectedPackage.packagePrice, 
-        packageCurrency, 
-        hotelCurrency
-      ));
-      
-      // Debug logging for currency conversion
-      if (packageCurrency !== hotelCurrency) {
-      }
-
-      // Calculate room cost (nights * room rate * number of rooms)
+      // Calculate room cost (nights * room rate * number of rooms) - all in INR
       const noOfRooms = parseInt(hotelEntry.noOfRooms) || 1;
-      let roomCost = nights * roomRate * noOfRooms;
-      const originalRoomCost = roomCost;
-      
-      // Convert room cost to package currency if needed
-      if (packageCurrency !== hotelCurrency) {
-        if (packageCurrency === 'INR' && hotelCurrency === 'USD') {
-          // Convert USD to INR
-          roomCost = roomCost * exchangeRate;
-        } else if (packageCurrency === 'USD' && hotelCurrency === 'INR') {
-          // Convert INR to USD
-          roomCost = roomCost / exchangeRate;
-        }
-      }
+      const roomCost = nights * roomRate * noOfRooms;
 
       // Calculate extra bed cost
       const noOfExtraBeds = parseInt(hotelEntry.noOfExtraBed) || 0;
@@ -358,17 +406,34 @@ const ExpenditureManagementPage = () => {
       
       // Get extra bed rate from hotel if available
       if (selectedHotel && selectedHotel.roomCategories) {
-        const roomCategory = selectedHotel.roomCategories.find(
+        // Try exact match first
+        let roomCategory = selectedHotel.roomCategories.find(
           cat => cat.category === hotelEntry.roomCategory
         );
+        
+        // Try case-insensitive match if no exact match
+        if (!roomCategory && hotelEntry.roomCategory) {
+          roomCategory = selectedHotel.roomCategories.find(
+            cat => cat.category && cat.category.toLowerCase().trim() === hotelEntry.roomCategory.toLowerCase().trim()
+          );
+        }
+        
         if (roomCategory && roomCategory.extraBedRate) {
           extraBedRate = parseFloat(roomCategory.extraBedRate) || 50;
         }
       } else if (selectedPackage.hotelName && selectedPackage.hotelName.roomCategories) {
         // Try package level hotel data
-        const roomCategory = selectedPackage.hotelName.roomCategories.find(
+        let roomCategory = selectedPackage.hotelName.roomCategories.find(
           cat => cat.category === hotelEntry.roomCategory
         );
+        
+        // Try case-insensitive match if no exact match
+        if (!roomCategory && hotelEntry.roomCategory) {
+          roomCategory = selectedPackage.hotelName.roomCategories.find(
+            cat => cat.category && cat.category.toLowerCase().trim() === hotelEntry.roomCategory.toLowerCase().trim()
+          );
+        }
+        
         if (roomCategory && roomCategory.extraBedRate) {
           extraBedRate = parseFloat(roomCategory.extraBedRate) || 50;
         }
@@ -383,19 +448,8 @@ const ExpenditureManagementPage = () => {
         extraBedRate = defaultExtraBedRates[hotelEntry.roomCategory] || 50;
       }
       
-      let extraBedCost = nights * noOfExtraBeds * extraBedRate;
-      const originalExtraBedCost = extraBedCost;
-      
-      // Convert extra bed cost to package currency if needed
-      if (packageCurrency !== hotelCurrency) {
-        if (packageCurrency === 'INR' && hotelCurrency === 'USD') {
-          // Convert USD to INR
-          extraBedCost = extraBedCost * exchangeRate;
-        } else if (packageCurrency === 'USD' && hotelCurrency === 'INR') {
-          // Convert INR to USD
-          extraBedCost = extraBedCost / exchangeRate;
-        }
-      }
+      // Calculate extra bed cost - all in INR
+      const extraBedCost = nights * noOfExtraBeds * extraBedRate;
 
       // Add to totals
       totalRoomCost += roomCost;
@@ -408,48 +462,21 @@ const ExpenditureManagementPage = () => {
         noOfRooms: noOfRooms,
         roomRate: roomRate,
         roomCost: Math.round(roomCost),
-        originalRoomCost: Math.round(originalRoomCost),
         noOfExtraBeds: noOfExtraBeds,
         extraBedRate: extraBedRate,
         extraBedCost: Math.round(extraBedCost),
-        originalExtraBedCost: Math.round(originalExtraBedCost),
-        hotelCurrency: hotelCurrency,
-        exchangeRate: exchangeRate,
         roomCategory: hotelEntry.roomCategory,
         destination: hotelEntry.destination?.destinationName || 'N/A'
       });
     });
 
-    // Calculate vehicle cost (based on total nights across all hotels)
+    // Calculate vehicle cost (based on total nights across all hotels) - all in INR
     let vehicleCost = 0;
-    let vehicleCurrency = 'USD'; // Default vehicle currency
-    let originalVehicleCost = 0;
     
     if (selectedPackage.vehicle) {
-      // Get vehicle rate from the vehicle reference
+      // Get vehicle rate from the vehicle reference (already in INR)
       const vehicleRate = parseFloat(selectedPackage.vehicle.vehicleRatePerDay) || 0;
-      vehicleCurrency = selectedPackage.vehicle.currency || 'USD';
       vehicleCost = totalNights * vehicleRate;
-      originalVehicleCost = vehicleCost;
-      
-      // Use the exchange rate from the first hotel (assuming all hotels use same currency)
-      const packageCurrency = selectedPackage.currency || 'INR';
-      const exchangeRate = customExchangeRate || (useManualRate ? manualExchangeRate : calculateExchangeRate(
-        selectedPackage.packagePrice, 
-        packageCurrency, 
-        vehicleCurrency
-      ));
-      
-      // Convert vehicle cost to package currency if needed
-      if (packageCurrency !== vehicleCurrency) {
-        if (packageCurrency === 'INR' && vehicleCurrency === 'USD') {
-          // Convert USD to INR
-          vehicleCost = vehicleCost * exchangeRate;
-        } else if (packageCurrency === 'USD' && vehicleCurrency === 'INR') {
-          // Convert INR to USD
-          vehicleCost = vehicleCost / exchangeRate;
-        }
-      }
     }
 
     // Add additional services (these are typically in the same currency as the package)
@@ -464,9 +491,6 @@ const ExpenditureManagementPage = () => {
     const additionalServicesTotal = additionalServices.reduce((sum, rate) => sum + rate, 0);
     const totalExpenditure = totalRoomCost + totalExtraBedCost + vehicleCost + additionalServicesTotal;
 
-    // Final logging for total expenditure
-    const packageCurrency = selectedPackage.currency || 'INR';
-
     return {
       totalExpenditure: Math.round(totalExpenditure),
       breakdown: {
@@ -474,9 +498,6 @@ const ExpenditureManagementPage = () => {
         extraBedCost: Math.round(totalExtraBedCost),
         vehicleCost: Math.round(vehicleCost),
         additionalServices: Math.round(additionalServicesTotal),
-        originalVehicleCost: Math.round(originalVehicleCost),
-        vehicleCurrency: vehicleCurrency,
-        convertedCurrency: packageCurrency,
         nights: totalNights,
         vehicleRate: selectedPackage.vehicle ? parseFloat(selectedPackage.vehicle.vehicleRatePerDay) || 0 : 0,
         vehicleName: selectedPackage.vehicle ? selectedPackage.vehicle.vehicleName : 'N/A',
@@ -500,10 +521,32 @@ const ExpenditureManagementPage = () => {
     return Math.round(price - exp);
   };
 
-  const handlePackageChange = (packageId) => {
-    const selectedPackage = packages.find(pkg => pkg._id === packageId);
+  const handlePackageChange = async (packageId) => {
+    // First try to find the package in the current list
+    let selectedPackage = packages.find(pkg => pkg._id === packageId);
+    
+    // If not found or if it seems incomplete, try to fetch fresh data
+    if (!selectedPackage || !selectedPackage.hotelName || !selectedPackage.checkinDate) {
+      try {
+        const token = localStorage.getItem('admin_token');
+        const response = await fetch(`${API_BASE_URL}/packages/${packageId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const freshPackageData = await response.json();
+          selectedPackage = freshPackageData;
+        }
+      } catch (error) {
+        // Error fetching fresh package data
+      }
+    }
     
     if (selectedPackage) {
+      console.log('Selected package for expenditure calculation:', selectedPackage);
       const expenditureResult = calculateExpenditure(selectedPackage);
       const packagePrice = selectedPackage.packagePrice;
       const calculatedProfit = calculateProfit(packagePrice, expenditureResult.totalExpenditure);
@@ -531,10 +574,6 @@ const ExpenditureManagementPage = () => {
         vehicleCost: 0,
         additionalServices: 0,
         totalExpenditure: 0,
-        originalCurrency: 'USD',
-        vehicleCurrency: 'USD',
-        convertedCurrency: 'INR',
-        exchangeRate: 83,
         services: {
           cialParking: 0,
           cialEntry: 0,
@@ -543,26 +582,6 @@ const ExpenditureManagementPage = () => {
           food: 0
         }
       });
-    }
-  };
-
-  const handleExchangeRateChange = (newRate) => {
-    setManualExchangeRate(newRate);
-    if (formData.package) {
-      const selectedPackage = packages.find(pkg => pkg._id === formData.package);
-      if (selectedPackage) {
-        const expenditureResult = calculateExpenditure(selectedPackage, newRate);
-        const packagePrice = selectedPackage.packagePrice;
-        const calculatedProfit = calculateProfit(packagePrice, expenditureResult.totalExpenditure);
-        
-        setFormData({
-          ...formData,
-          packageExpenditure: expenditureResult.totalExpenditure.toString(),
-          packageProfit: calculatedProfit.toString()
-        });
-        
-        setExpenditureBreakdown(expenditureResult.breakdown);
-      }
     }
   };
 
@@ -647,22 +666,13 @@ const ExpenditureManagementPage = () => {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                    {expenditure.packageExpenditure}
-                    <span className="text-xs text-white/50 ml-1">
-                      ({expenditure.package?.currency || 'INR'})
-                    </span>
+                    ₹{expenditure.packageExpenditure}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                    {expenditure.packagePrice}
-                    <span className="text-xs text-white/50 ml-1">
-                      ({expenditure.package?.currency || 'INR'})
-                    </span>
+                    ₹{expenditure.packagePrice}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                    {expenditure.packageProfit}
-                    <span className="text-xs text-white/50 ml-1">
-                      ({expenditure.package?.currency || 'INR'})
-                    </span>
+                    ₹{expenditure.packageProfit}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
@@ -838,7 +848,7 @@ const ExpenditureManagementPage = () => {
                     </label>
                     <input
                       type="text"
-                      value={formData.packageExpenditure}
+                      value={formData.packageExpenditure ? `₹${formData.packageExpenditure}` : ''}
                       readOnly
                       className="w-full px-3 py-2 bg-[#0f1310]/50 border border-[#5B8424]/30 rounded-lg text-white cursor-not-allowed"
                       placeholder="Select a package to auto-calculate"
@@ -879,7 +889,7 @@ const ExpenditureManagementPage = () => {
                               </div>
                               <div className="flex justify-between">
                                 <span>Room Rate:</span>
-                                <span className="text-green-300">{hotel.roomRate} {hotel.hotelCurrency}/night</span>
+                                <span className="text-green-300">₹{hotel.roomRate}/night</span>
                               </div>
                               <div className="flex justify-between">
                                 <span>Extra Beds:</span>
@@ -887,34 +897,12 @@ const ExpenditureManagementPage = () => {
                               </div>
                               <div className="flex justify-between">
                                 <span>Extra Bed Rate:</span>
-                                <span className="text-green-300">{hotel.extraBedRate} {hotel.hotelCurrency}/night</span>
+                                <span className="text-green-300">₹{hotel.extraBedRate}/night</span>
                               </div>
-                              {hotel.hotelCurrency !== expenditureBreakdown.convertedCurrency && (
-                                <div className="flex justify-between">
-                                  <span>Exchange Rate:</span>
-                                  <span className="text-yellow-300">1 {hotel.hotelCurrency} = {hotel.exchangeRate} {expenditureBreakdown.convertedCurrency}</span>
-                                </div>
-                              )}
                               <div className="border-t border-green-500/20 pt-1 mt-2">
-                                <div className="flex justify-between text-xs">
-                                  <span>Original Room Cost:</span>
-                                  <span className="text-blue-300">{hotel.originalRoomCost} {hotel.hotelCurrency}</span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                  <span>Converted Room Cost:</span>
-                                  <span className="text-green-300">{hotel.roomCost} {expenditureBreakdown.convertedCurrency}</span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                  <span>Original Extra Bed Cost:</span>
-                                  <span className="text-blue-300">{hotel.originalExtraBedCost} {hotel.hotelCurrency}</span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                  <span>Converted Extra Bed Cost:</span>
-                                  <span className="text-green-300">{hotel.extraBedCost} {expenditureBreakdown.convertedCurrency}</span>
-                                </div>
-                                <div className="flex justify-between text-xs font-medium border-t border-green-500/20 pt-1 mt-1">
+                                <div className="flex justify-between text-xs font-medium">
                                   <span>Hotel Total:</span>
-                                  <span className="text-green-300">{hotel.roomCost + hotel.extraBedCost} {expenditureBreakdown.convertedCurrency}</span>
+                                  <span className="text-green-300">₹{hotel.roomCost + hotel.extraBedCost}</span>
                                 </div>
                               </div>
                             </div>
@@ -927,15 +915,15 @@ const ExpenditureManagementPage = () => {
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Total Room Cost:</span>
-                            <span className="text-green-300">{expenditureBreakdown.roomCost} {expenditureBreakdown.convertedCurrency}</span>
+                            <span className="text-green-300">₹{expenditureBreakdown.roomCost}</span>
                           </div>
                           <div className="flex justify-between text-sm">
                             <span>Total Extra Bed Cost:</span>
-                            <span className="text-green-300">{expenditureBreakdown.extraBedCost} {expenditureBreakdown.convertedCurrency}</span>
+                            <span className="text-green-300">₹{expenditureBreakdown.extraBedCost}</span>
                           </div>
                           <div className="flex justify-between text-sm font-medium border-t border-green-500/20 pt-1 mt-1">
                             <span>Total Hotel Cost:</span>
-                            <span className="text-green-300">{expenditureBreakdown.roomCost + expenditureBreakdown.extraBedCost} {expenditureBreakdown.convertedCurrency}</span>
+                            <span className="text-green-300">₹{expenditureBreakdown.roomCost + expenditureBreakdown.extraBedCost}</span>
                           </div>
                         </div>
                       </div>
@@ -956,16 +944,12 @@ const ExpenditureManagementPage = () => {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-sm">Rate:</span>
-                          <span className="font-medium text-orange-300">{expenditureBreakdown.vehicleRate} {expenditureBreakdown.vehicleCurrency}/day</span>
+                          <span className="font-medium text-orange-300">₹{expenditureBreakdown.vehicleRate}/day</span>
                         </div>
                         <div className="border-t border-orange-500/20 pt-2 mt-3">
-                          <div className="flex justify-between text-sm">
-                            <span>Original:</span>
-                            <span className="text-yellow-300">{expenditureBreakdown.originalVehicleCost} {expenditureBreakdown.vehicleCurrency}</span>
-                          </div>
                           <div className="flex justify-between text-sm font-medium">
-                            <span>Converted:</span>
-                            <span className="text-orange-300">{expenditureBreakdown.vehicleCost} {expenditureBreakdown.convertedCurrency}</span>
+                            <span>Vehicle Cost:</span>
+                            <span className="text-orange-300">₹{expenditureBreakdown.vehicleCost}</span>
                           </div>
                         </div>
                       </div>
@@ -976,17 +960,10 @@ const ExpenditureManagementPage = () => {
                   <div>
                     <label className="block text-sm font-medium text-white/70 mb-2">
                       Package Price (From Package)
-                      {formData.package && (() => {
-                        const selectedPackage = packages.find(pkg => pkg._id === formData.package);
-                        if (selectedPackage) {
-                          return <span className="text-yellow-400 ml-2">({selectedPackage.currency || 'INR'})</span>;
-                        }
-                        return null;
-                      })()}
                     </label>
                     <input
                       type="text"
-                      value={formData.packagePrice}
+                      value={formData.packagePrice ? `₹${formData.packagePrice}` : ''}
                       readOnly
                       className="w-full px-3 py-2 bg-[#0f1310]/50 border border-[#5B8424]/30 rounded-lg text-white cursor-not-allowed"
                       placeholder="Select a package to load price"
@@ -997,17 +974,10 @@ const ExpenditureManagementPage = () => {
                   <div>
                     <label className="block text-sm font-medium text-white/70 mb-2">
                       Package Profit (Auto-calculated)
-                      {formData.package && (() => {
-                        const selectedPackage = packages.find(pkg => pkg._id === formData.package);
-                        if (selectedPackage) {
-                          return <span className="text-yellow-400 ml-2">({selectedPackage.currency || 'INR'})</span>;
-                        }
-                        return null;
-                      })()}
                     </label>
                     <input
                       type="text"
-                      value={formData.packageProfit}
+                      value={formData.packageProfit ? `₹${formData.packageProfit}` : ''}
                       readOnly
                       className={`w-full px-3 py-2 bg-[#0f1310]/50 border rounded-lg text-white cursor-not-allowed ${
                         parseFloat(formData.packageProfit) >= 0 
@@ -1033,28 +1003,28 @@ const ExpenditureManagementPage = () => {
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
                           <span>CIAL Parking:</span>
-                          <span className="text-purple-300">{expenditureBreakdown.services?.cialParking || 0} {expenditureBreakdown.convertedCurrency}</span>
+                          <span className="text-purple-300">₹{expenditureBreakdown.services?.cialParking || 0}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>CIAL Entry:</span>
-                          <span className="text-purple-300">{expenditureBreakdown.services?.cialEntry || 0} {expenditureBreakdown.convertedCurrency}</span>
+                          <span className="text-purple-300">₹{expenditureBreakdown.services?.cialEntry || 0}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>Bouquet:</span>
-                          <span className="text-purple-300">{expenditureBreakdown.services?.bouquet || 0} {expenditureBreakdown.convertedCurrency}</span>
+                          <span className="text-purple-300">₹{expenditureBreakdown.services?.bouquet || 0}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>SIM Card:</span>
-                          <span className="text-purple-300">{expenditureBreakdown.services?.simCard || 0} {expenditureBreakdown.convertedCurrency}</span>
+                          <span className="text-purple-300">₹{expenditureBreakdown.services?.simCard || 0}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                           <span>Food:</span>
-                          <span className="text-purple-300">{expenditureBreakdown.services?.food || 0} {expenditureBreakdown.convertedCurrency}</span>
+                          <span className="text-purple-300">₹{expenditureBreakdown.services?.food || 0}</span>
                         </div>
                         <div className="border-t border-purple-500/20 pt-2 mt-3">
                           <div className="flex justify-between text-sm font-medium">
                             <span>Total Services:</span>
-                            <span className="text-purple-300">{expenditureBreakdown.additionalServices} {expenditureBreakdown.convertedCurrency}</span>
+                            <span className="text-purple-300">₹{expenditureBreakdown.additionalServices}</span>
                           </div>
                         </div>
                       </div>
@@ -1070,149 +1040,40 @@ const ExpenditureManagementPage = () => {
                       <div className="grid grid-cols-2 gap-3">
                         <div className="text-center p-3 bg-green-900/20 border border-green-500/30 rounded">
                           <div className="text-xs text-green-300 mb-1">Room Cost</div>
-                          <div className="text-lg font-bold text-green-400">{expenditureBreakdown.roomCost}</div>
-                          <div className="text-xs text-white/60">{expenditureBreakdown.convertedCurrency}</div>
+                          <div className="text-lg font-bold text-green-400">₹{expenditureBreakdown.roomCost}</div>
                         </div>
                         <div className="text-center p-3 bg-blue-900/20 border border-blue-500/30 rounded">
                           <div className="text-xs text-blue-300 mb-1">Extra Beds</div>
-                          <div className="text-lg font-bold text-blue-400">{expenditureBreakdown.extraBedCost}</div>
-                          <div className="text-xs text-white/60">{expenditureBreakdown.convertedCurrency}</div>
+                          <div className="text-lg font-bold text-blue-400">₹{expenditureBreakdown.extraBedCost}</div>
                         </div>
                         {expenditureBreakdown.vehicleCost > 0 && (
                           <div className="text-center p-3 bg-orange-900/20 border border-orange-500/30 rounded">
                             <div className="text-xs text-orange-300 mb-1">Vehicle</div>
-                            <div className="text-lg font-bold text-orange-400">{expenditureBreakdown.vehicleCost}</div>
-                            <div className="text-xs text-white/60">{expenditureBreakdown.convertedCurrency}</div>
+                            <div className="text-lg font-bold text-orange-400">₹{expenditureBreakdown.vehicleCost}</div>
                           </div>
                         )}
                         <div className="text-center p-3 bg-purple-900/20 border border-purple-500/30 rounded">
                           <div className="text-xs text-purple-300 mb-1">Services</div>
-                          <div className="text-lg font-bold text-purple-400">{expenditureBreakdown.additionalServices}</div>
-                          <div className="text-xs text-white/60">{expenditureBreakdown.convertedCurrency}</div>
+                          <div className="text-lg font-bold text-purple-400">₹{expenditureBreakdown.additionalServices}</div>
                         </div>
                         <div className={`text-center p-3 bg-yellow-900/20 border border-yellow-500/30 rounded ${expenditureBreakdown.vehicleCost > 0 ? 'col-span-2' : 'col-span-2'}`}>
                           <div className="text-xs text-yellow-300 mb-1">Total</div>
-                          <div className="text-lg font-bold text-yellow-400">{formData.packageExpenditure}</div>
-                          <div className="text-xs text-white/60">{expenditureBreakdown.convertedCurrency}</div>
+                          <div className="text-lg font-bold text-yellow-400">₹{formData.packageExpenditure}</div>
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Currency Conversion Info */}
-                  {formData.package && expenditureBreakdown.originalCurrency !== expenditureBreakdown.convertedCurrency && (
-                    <div className="p-4 bg-yellow-900/20 border border-yellow-500/30 rounded">
-                      <div className="font-medium text-yellow-400 mb-3 flex items-center">
-                        <CurrencyDollarIcon className="h-5 w-5 mr-2 inline" /> Currency Conversion Details
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span>From Currency:</span>
-                          <span className="font-medium text-yellow-300">{expenditureBreakdown.originalCurrency}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>To Currency:</span>
-                          <span className="font-medium text-yellow-300">{expenditureBreakdown.convertedCurrency}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Exchange Rate:</span>
-                          <span className="font-medium text-yellow-300">1 {expenditureBreakdown.originalCurrency} = {expenditureBreakdown.exchangeRate} {expenditureBreakdown.convertedCurrency}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
-
-              {/* Manual Exchange Rate Section - Full Width */}
-              {formData.package && expenditureBreakdown.originalCurrency !== expenditureBreakdown.convertedCurrency && (
-                <div className="p-4 bg-[#1a1a1a]/30 border border-[#5B8424]/30 rounded-lg">
-                  <div className="flex items-center justify-between mb-4">
-                    <label className="text-sm font-medium text-white/70 flex items-center">
-                      <CurrencyDollarIcon className="h-5 w-5 mr-2 inline" /> Manual Exchange Rate Control
-                    </label>
-                    <div className="flex items-center space-x-3">
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id="useManualRate"
-                          checked={useManualRate}
-                          onChange={(e) => setUseManualRate(e.target.checked)}
-                          className="rounded"
-                        />
-                        <label htmlFor="useManualRate" className="text-xs text-white/60">
-                          Use Manual Rate
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <label className="block text-xs text-white/60 font-medium">
-                        Current Auto Rate
-                      </label>
-                      <div className="p-3 bg-[#0f1310]/50 border border-[#5B8424]/30 rounded">
-                        <div className="text-center">
-                          <div className="text-lg font-bold text-green-400">{expenditureBreakdown.exchangeRate}</div>
-                          <div className="text-xs text-white/60">
-                            1 {expenditureBreakdown.originalCurrency} = {expenditureBreakdown.exchangeRate} {expenditureBreakdown.convertedCurrency}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <label className="block text-xs text-white/60 font-medium">
-                        Manual Rate Input
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={manualExchangeRate}
-                        onChange={(e) => handleExchangeRateChange(parseFloat(e.target.value) || 83)}
-                        className="w-full px-3 py-2 bg-[#0f1310] border border-[#5B8424]/30 rounded text-white text-sm focus:outline-none focus:border-[#5B8424]"
-                        placeholder="Enter custom rate"
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <label className="block text-xs text-white/60 font-medium">
-                        Active Rate
-                      </label>
-                      <div className="p-3 bg-[#0f1310]/50 border border-yellow-500/30 rounded">
-                        <div className="text-center">
-                          <div className="text-lg font-bold text-yellow-400">
-                            {useManualRate ? manualExchangeRate : expenditureBreakdown.exchangeRate}
-                          </div>
-                          <div className="text-xs text-white/60">
-                            Currently using: {useManualRate ? 'Manual' : 'Auto'} rate
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-3 p-2 bg-[#0f1310]/30 rounded text-xs text-center text-white/50">
-                    <span className="font-medium">Live Rate:</span> 1 {expenditureBreakdown.originalCurrency} = {useManualRate ? manualExchangeRate : expenditureBreakdown.exchangeRate} {expenditureBreakdown.convertedCurrency}
-                  </div>
-                </div>
-              )}
 
               <div>
                 <label className="block text-sm font-medium text-white/70 mb-2">
                   Package Price (From Package)
-                  {formData.package && (() => {
-                    const selectedPackage = packages.find(pkg => pkg._id === formData.package);
-                    if (selectedPackage) {
-                      return <span className="text-yellow-400 ml-2">({selectedPackage.currency || 'INR'})</span>;
-                    }
-                    return null;
-                  })()}
                 </label>
                 <input
                   type="text"
-                  value={formData.packagePrice}
+                  value={formData.packagePrice ? `₹${formData.packagePrice}` : ''}
                   readOnly
                   className="w-full px-3 py-2 bg-[#0f1310]/50 border border-[#5B8424]/30 rounded-lg text-white cursor-not-allowed"
                   placeholder="Select a package to load price"
@@ -1222,17 +1083,10 @@ const ExpenditureManagementPage = () => {
               <div>
                 <label className="block text-sm font-medium text-white/70 mb-2">
                   Package Profit (Auto-calculated)
-                  {formData.package && (() => {
-                    const selectedPackage = packages.find(pkg => pkg._id === formData.package);
-                    if (selectedPackage) {
-                      return <span className="text-yellow-400 ml-2">({selectedPackage.currency || 'INR'})</span>;
-                    }
-                    return null;
-                  })()}
                 </label>
                 <input
                   type="text"
-                  value={formData.packageProfit}
+                  value={formData.packageProfit ? `₹${formData.packageProfit}` : ''}
                   readOnly
                   className={`w-full px-3 py-2 bg-[#0f1310]/50 border rounded-lg text-white cursor-not-allowed ${
                     parseFloat(formData.packageProfit) >= 0 
@@ -1270,10 +1124,6 @@ const ExpenditureManagementPage = () => {
                       vehicleCost: 0,
                       additionalServices: 0,
                       totalExpenditure: 0,
-                      originalCurrency: 'USD',
-                      vehicleCurrency: 'USD',
-                      convertedCurrency: 'INR',
-                      exchangeRate: 83,
                       services: {
                         cialParking: 0,
                         cialEntry: 0,
@@ -1282,8 +1132,6 @@ const ExpenditureManagementPage = () => {
                         food: 0
                       }
                     });
-                    setUseManualRate(false);
-                    setManualExchangeRate(83);
                   }}
                   className="flex-1 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors"
                 >
@@ -1483,13 +1331,13 @@ const ExpenditureManagementPage = () => {
                     <div className="flex justify-between items-center p-3 bg-green-900/20 rounded">
                       <span className="text-white/70">Package Price:</span>
                       <span className="text-green-400 font-bold text-lg">
-                        {selectedExpenditure.packagePrice} {selectedExpenditure.package?.currency || 'INR'}
+                        ₹{selectedExpenditure.packagePrice}
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-red-900/20 rounded">
                       <span className="text-white/70">Total Expenditure:</span>
                       <span className="text-red-400 font-bold text-lg">
-                        {selectedExpenditure.packageExpenditure} {selectedExpenditure.package?.currency || 'INR'}
+                        ₹{selectedExpenditure.packageExpenditure}
                       </span>
                     </div>
                     <div className="flex justify-between items-center p-3 bg-yellow-900/20 rounded">
@@ -1497,7 +1345,7 @@ const ExpenditureManagementPage = () => {
                       <span className={`font-bold text-lg ${
                         parseFloat(selectedExpenditure.packageProfit) >= 0 ? 'text-green-400' : 'text-red-400'
                       }`}>
-                        {selectedExpenditure.packageProfit} {selectedExpenditure.package?.currency || 'INR'}
+                        ₹{selectedExpenditure.packageProfit}
                       </span>
                     </div>
                   </div>
@@ -1541,23 +1389,23 @@ const ExpenditureManagementPage = () => {
                   <div className="space-y-2">
                     <div className="flex justify-between">
                       <span className="text-white/70">CIAL Parking:</span>
-                      <span className="text-white font-medium">{selectedExpenditure.package?.cialParkingRate || '0'} {selectedExpenditure.package?.currency || 'INR'}</span>
+                      <span className="text-white font-medium">₹{selectedExpenditure.package?.cialParkingRate || '0'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/70">CIAL Entry:</span>
-                      <span className="text-white font-medium">{selectedExpenditure.package?.cialEntryRate || '0'} {selectedExpenditure.package?.currency || 'INR'}</span>
+                      <span className="text-white font-medium">₹{selectedExpenditure.package?.cialEntryRate || '0'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/70">Bouquet:</span>
-                      <span className="text-white font-medium">{selectedExpenditure.package?.bouquetRate || '0'} {selectedExpenditure.package?.currency || 'INR'}</span>
+                      <span className="text-white font-medium">₹{selectedExpenditure.package?.bouquetRate || '0'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/70">SIM Card:</span>
-                      <span className="text-white font-medium">{selectedExpenditure.package?.simCardRate || '0'} {selectedExpenditure.package?.currency || 'INR'}</span>
+                      <span className="text-white font-medium">₹{selectedExpenditure.package?.simCardRate || '0'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-white/70">Food:</span>
-                      <span className="text-white font-medium">{selectedExpenditure.package?.foodRate || '0'} {selectedExpenditure.package?.currency || 'INR'}</span>
+                      <span className="text-white font-medium">₹{selectedExpenditure.package?.foodRate || '0'}</span>
                     </div>
                   </div>
                 </div>
@@ -1586,7 +1434,7 @@ const ExpenditureManagementPage = () => {
                       <span className="text-white/70">Vehicle Rate:</span>
                       <span className="text-white font-medium">
                         {selectedExpenditure.package?.vehicle?.vehicleRatePerDay 
-                          ? `${getCurrencySymbol(selectedExpenditure.package.vehicle.currency)}${selectedExpenditure.package.vehicle.vehicleRatePerDay}/day`
+                          ? `${getCurrencySymbol()}${selectedExpenditure.package.vehicle.vehicleRatePerDay}/day`
                           : 'N/A'
                         }
                       </span>
